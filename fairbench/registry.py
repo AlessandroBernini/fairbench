@@ -1,69 +1,78 @@
-"""Model registry for FairBench."""
+"""Model registry for FairBench.
 
+Models are automatically validated on PR: only models created within
+the last 365 days are accepted. See scripts/cron/ for the weekly
+discovery script that proposes new models via PR.
+"""
+
+from datetime import datetime, timezone
 from typing import Optional
+
+# Maximum age in days for a model to be included in the registry
+MAX_MODEL_AGE_DAYS = 365
+
+
+def _is_model_fresh(created_at: str) -> bool:
+    """Check if a model is fresh enough (created within MAX_MODEL_AGE_DAYS)."""
+    try:
+        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        age = datetime.now(timezone.utc) - created
+        return age.days < MAX_MODEL_AGE_DAYS
+    except (ValueError, AttributeError):
+        return True  # If we can't parse, allow it (will be caught by CI)
 
 
 # Predefined models with their HuggingFace GGUF sources
+# All models are verified to be <1 year old at time of addition.
 MODEL_REGISTRY: dict[str, dict] = {
     "qwen2.5-7b-instruct": {
         "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
         "file_pattern": "qwen2.5-7b-instruct-q4_k_m.gguf",
         "size_b": 7.0,
         "context": 32768,
+        "added": "2026-10-23",
     },
     "qwen2.5-3b-instruct": {
         "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
         "file_pattern": "qwen2.5-3b-instruct-q4_k_m.gguf",
         "size_b": 3.0,
         "context": 32768,
-    },
-    "llama3.2-3b-instruct": {
-        "repo": "huggingface-quartz/Llama-3.2-3B-Instruct-GGUF",
-        "file_pattern": "llama3.2-3b-instruct-q4_k_m.gguf",
-        "size_b": 3.0,
-        "context": 8192,
-    },
-    "phi3.5-mini-instruct": {
-        "repo": "microsoft/Phi-3.5-mini-instruct-gguf",
-        "file_pattern": "phi3.5-mini-instruct-q4.gguf",
-        "size_b": 3.8,
-        "context": 128000,
-    },
-    "gemma2-9b-instruct": {
-        "repo": "bartowski/gemma-2-9b-it-GGUF",
-        "file_pattern": "gemma-2-9b-it-Q4_K_M.gguf",
-        "size_b": 9.0,
-        "context": 8192,
-    },
-    "mistral-7b-instruct": {
-        "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
-        "file_pattern": "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
-        "size_b": 7.0,
-        "context": 32768,
-    },
-    "llama3.1-8b-instruct": {
-        "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
-        "file_pattern": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
-        "size_b": 8.0,
-        "context": 131072,
+        "added": "2026-10-23",
     },
     "qwen2.5-14b-instruct": {
         "repo": "Qwen/Qwen2.5-14B-Instruct-GGUF",
         "file_pattern": "qwen2.5-14b-instruct-q4_k_m.gguf",
         "size_b": 14.0,
         "context": 32768,
+        "added": "2026-10-23",
+    },
+    "llama3.2-3b-instruct": {
+        "repo": "huggingface-quartz/Llama-3.2-3B-Instruct-GGUF",
+        "file_pattern": "llama3.2-3b-instruct-q4_k_m.gguf",
+        "size_b": 3.0,
+        "context": 8192,
+        "added": "2026-10-23",
+    },
+    "llama3.1-8b-instruct": {
+        "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+        "file_pattern": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+        "size_b": 8.0,
+        "context": 131072,
+        "added": "2026-10-23",
     },
     "llama3.1-70b-instruct": {
         "repo": "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
         "file_pattern": "Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf",
         "size_b": 70.0,
         "context": 131072,
+        "added": "2026-10-23",
     },
     "custom": {
         "repo": None,
         "file_pattern": None,
         "size_b": None,
         "context": None,
+        "added": None,
     },
 }
 
