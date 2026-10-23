@@ -23,16 +23,21 @@ jobs:
       - name: Install dependencies
         run: pip install huggingface_hub
       
-      - name: Discover new models
+      - name: Discover new models and check for outdated ones
         run: python scripts/cron/discover_models.py
       
-      - name: Create PR if new models found
+      - name: Create PR with new and old models
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: discover/new-models
-          title: "📦 New GGUF models discovered"
+          title: "📦 New GGUF models & outdated model cleanup"
           body: |
-            Automated discovery of new GGUF models from HuggingFace.
-            Review and merge to add valid models to the registry.
+            ## New models to review
+            See `discovered/new-models-*.md` for proposed additions.
+            
+            ## Outdated models to remove
+            See `discovered/old-models-*.md` for models older than 365 days.
+            
+            Please review and merge to keep the registry current.
           base: main
