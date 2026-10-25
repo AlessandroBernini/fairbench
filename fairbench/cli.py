@@ -1,6 +1,7 @@
 """CLI for FairBench."""
 
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -17,7 +18,7 @@ console = Console()
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """FairBench - Fair benchmarking for local LLMs under 70B on consumer hardware."""
     pass
 
@@ -59,9 +60,9 @@ def cli():
     default=None,
     help="Publish to leaderboard (default: from config)"
 )
-def run(model: str, quant: str, n_gpu_layers: int,
-        n_threads: int, n_tokens: int,
-        lite: bool, tasks: str, publish):
+def run(model: str, quant: str | None, n_gpu_layers: int | None,
+        n_threads: int | None, n_tokens: int,
+        lite: bool, tasks: str | None, publish: bool | None) -> None:
     """Run a benchmark on the specified model."""
     config = Config()
 
@@ -159,7 +160,7 @@ def run(model: str, quant: str, n_gpu_layers: int,
 
 @cli.command()
 @click.option("--latest", "-l", is_flag=True, help="Show latest report")
-def report(latest: bool):
+def report(latest: bool) -> None:
     """View benchmark reports."""
     config = Config()
     reporter = Reporter(config.results_dir)
@@ -191,7 +192,7 @@ def report(latest: bool):
 
 
 @cli.command()
-def publish():
+def publish() -> None:
     """Publish latest report to leaderboard."""
     config = Config()
     reporter = Reporter(config.results_dir)
@@ -217,7 +218,7 @@ def publish():
 
 
 @cli.command()
-def list_benchmarks():
+def list_benchmarks() -> None:
     """List all available benchmark categories."""
     console.print("[bold]Available benchmarks:[/bold]")
     console.print(f"  {'Name':<15} {'Type':<20} {'Lite Mode'}")
@@ -233,7 +234,7 @@ def list_benchmarks():
 
 
 @cli.command()
-def list_cli_models():
+def list_cli_models() -> None:
     """List all available models in the registry."""
     models = list_models()
     console.print("[bold]Available models:[/bold]")
@@ -245,7 +246,7 @@ def list_cli_models():
             console.print(f"  {name} (custom)")
 
 
-def _print_report(report: dict):
+def _print_report(report: dict[str, Any]) -> None:
     """Print a formatted report."""
     console.print(f"\n[bold]Report: {report['id']}[/bold]")
     console.print(f"Timestamp: {report['timestamp']}")

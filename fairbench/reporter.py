@@ -4,6 +4,7 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -24,10 +25,10 @@ class Reporter:
         self,
         model_name: str,
         quantization: str,
-        hardware: dict,
-        quality: dict,
-        speed: dict,
-        memory: dict,
+        hardware: dict[str, Any],
+        quality: dict[str, Any],
+        speed: dict[str, Any],
+        memory: dict[str, Any],
         publish: bool = True,
     ) -> Path:
         """Generate a benchmark report and optionally publish it."""
@@ -59,7 +60,7 @@ class Reporter:
 
         return filepath
 
-    def _publish(self, report: dict) -> bool:
+    def _publish(self, report: dict[str, Any]) -> bool:
         """Send report to the Vercel API."""
         try:
             resp = requests.post(
@@ -76,14 +77,14 @@ class Reporter:
             print(f"Warning: publish failed ({e})")
             return False
 
-    def get_latest(self) -> dict | None:
+    def get_latest(self) -> dict[str, Any] | None:
         """Get the latest report."""
         files = sorted(self.results_dir.glob("*.json"))
         if not files:
             return None
-        return json.loads(files[-1].read_text())
+        return json.loads(files[-1].read_text())  # type: ignore[no-any-return]
 
-    def list_reports(self, limit: int = 10) -> list[dict]:
+    def list_reports(self, limit: int = 10) -> list[dict[str, Any]]:
         """List recent reports."""
         files = sorted(self.results_dir.glob("*.json"), reverse=True)[:limit]
         reports = []
@@ -97,7 +98,7 @@ class Reporter:
             })
         return reports
 
-    def get_leaderboard(self, model: str | None = None, gpu: str | None = None) -> list[dict]:
+    def get_leaderboard(self, model: str | None = None, gpu: str | None = None) -> list[dict[str, Any]]:
         """Fetch leaderboard data from the API."""
         try:
             params = {}
@@ -111,12 +112,12 @@ class Reporter:
                 timeout=30,
             )
             if resp.status_code == 200:
-                return resp.json().get("reports", [])
+                return resp.json().get("reports", [])  # type: ignore[no-any-return]
             return []
         except requests.RequestException:
             return []
 
-    def get_model_stats(self) -> list[dict]:
+    def get_model_stats(self) -> list[dict[str, Any]]:
         """Fetch model statistics from the API."""
         try:
             resp = requests.get(
@@ -124,7 +125,7 @@ class Reporter:
                 timeout=30,
             )
             if resp.status_code == 200:
-                return resp.json().get("models", [])
+                return resp.json().get("models", [])  # type: ignore[no-any-return]
             return []
         except requests.RequestException:
             return []

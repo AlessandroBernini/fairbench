@@ -262,9 +262,9 @@ def get_available_tasks() -> list[str]:
     return list(BENCHMARK_INFO.keys())
 
 
-def get_task_info(task_name: str) -> dict:
+def get_task_info(task_name: str) -> dict[str, str | bool]:
     """Return metadata for a benchmark task."""
-    return BENCHMARK_INFO.get(task_name, {
+    return BENCHMARK_INFO.get(task_name, {  # type: ignore[return-value]
         "name": task_name,
         "description": "Unknown task",
         "type": "unknown",

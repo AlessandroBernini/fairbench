@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import psutil
 from rich.console import Console
@@ -11,7 +12,7 @@ from rich.console import Console
 console = Console()
 
 
-def detect_hardware() -> dict:
+def detect_hardware() -> dict[str, Any]:
     """Detect system hardware."""
     info = {
         "cpu": _get_cpu_info(),
@@ -22,7 +23,7 @@ def detect_hardware() -> dict:
     return info
 
 
-def _get_cpu_info() -> dict:
+def _get_cpu_info() -> dict[str, Any]:
     """Get CPU information."""
     return {
         "model": psutil.cpu_freq().current if psutil.cpu_freq() else "unknown",
@@ -31,7 +32,7 @@ def _get_cpu_info() -> dict:
     }
 
 
-def _get_gpu_info() -> dict:
+def _get_gpu_info() -> dict[str, Any]:
     """Get GPU information."""
     try:
         result = subprocess.run(
@@ -68,7 +69,7 @@ def benchmark_speed(
     n_tokens: int = 512,
     n_gpu_layers: int = -1,
     n_threads: int = 0,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark inference speed using llama-cpp-python.
 
     Measures TTFT (time to first token), TPOT (tokens per output token),
@@ -114,7 +115,7 @@ def _benchmark_with_llama_bench(
     n_tokens: int,
     n_gpu_layers: int,
     n_threads: int,
-) -> dict:
+) -> dict[str, Any]:
     """Try llama-bench CLI for speed measurement."""
     cmd = [
         "llama-bench",
@@ -160,7 +161,7 @@ def _benchmark_with_llama_cpp(
     n_tokens: int,
     n_gpu_layers: int,
     n_threads: int,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark using llama-cpp-python bindings with precise timing."""
     try:
         from llama_cpp import Llama
@@ -290,7 +291,7 @@ def _load_model(model_path: Path, n_gpu_layers: int = -1) -> None:
 def benchmark_memory(
     model_path: Path,
     n_gpu_layers: int = -1,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark memory usage of a loaded model.
 
     Measures VRAM peak (via nvidia-smi) and CPU RAM peak (via psutil)
