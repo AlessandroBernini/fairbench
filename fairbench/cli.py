@@ -23,15 +23,45 @@ def cli():
 
 
 @cli.command()
-@click.option("--model", "-m", required=True, help="Model name or path to GGUF file")
+@click.option("--model", "-m", required=True, help="Model name or GGUF path")
 @click.option("--quant", "-q", default=None, help="Quantization (default: from config)")
-@click.option("--n-gpu-layers", "-ngl", default=None, help="Number of GPU layers (default: from config)")
-@click.option("--n-threads", "-t", default=None, help="Number of CPU threads (default: auto)")
-@click.option("--n-tokens", "-n", default=512, help="Number of tokens to generate (default: 512)")
-@click.option("--lite/--full", default=True, help="Use lite mode for quality benchmark (default: lite)")
-@click.option("--tasks", default=None, help=f"Benchmarks to run (comma-separated). Default: {','.join(DEFAULT_TASKS)}. Available: {', '.join(get_available_tasks())}")
-@click.option("--publish/--no-publish", "-p/-np", default=None, help="Publish to leaderboard (default: from config)")
-def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, lite: bool, tasks: str, publish):
+@click.option(
+    "--n-gpu-layers", "-ngl",
+    default=None,
+    help="GPU layers (default: from config)"
+)
+@click.option(
+    "--n-threads", "-t",
+    default=None,
+    help="CPU threads (default: auto)"
+)
+@click.option(
+    "--n-tokens", "-n",
+    default=512,
+    help="Tokens to generate (default: 512)"
+)
+@click.option(
+    "--lite/--full",
+    default=True,
+    help="Lite mode for quality benchmark"
+)
+@click.option(
+    "--tasks",
+    default=None,
+    help=(
+        "Benchmarks to run (comma-separated). "
+        f"Default: {','.join(DEFAULT_TASKS)}. "
+        f"Available: {', '.join(get_available_tasks())}"
+    )
+)
+@click.option(
+    "--publish/--no-publish", "-p/-np",
+    default=None,
+    help="Publish to leaderboard (default: from config)"
+)
+def run(model: str, quant: str, n_gpu_layers: int,
+        n_threads: int, n_tokens: int,
+        lite: bool, tasks: str, publish):
     """Run a benchmark on the specified model."""
     config = Config()
 
@@ -51,11 +81,19 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
         # Try to get from registry
         model_info = get_model_info(model)
         if model_info.get('repo'):
-            console.print(f"[yellow]Model '{model}' not found locally. Please download the GGUF first.[/yellow]")
+            console.print(
+                f"[yellow]Model '{model}' not found locally. "
+                "Please download the GGUF first.[/yellow]"
+            )
             console.print(f"  Source: {model_info['repo']}")
             console.print(f"  File pattern: {model_info['file_pattern']}")
             console.print("\n[bold]Download with:[/bold]")
-            console.print(f"  huggingface-cli download {model_info['repo']} {model_info['file_pattern']} --local-dir ~/.fairbench/models/")
+            console.print(
+                f"  huggingface-cli download "
+                f"{model_info['repo']} "
+                f"{model_info['file_pattern']} "
+                f"--local-dir ~/.fairbench/models/"
+            )
             return
         else:
             console.print(f"[red]Error: '{model}' not found and not in registry.[/red]")
@@ -72,7 +110,11 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
     # Detect hardware
     hardware = detect_hardware()
     console.print("[bold green]Hardware detected:[/bold green]")
-    console.print(f"  CPU: {hardware['cpu']['model']} ({hardware['cpu']['cores']} cores / {hardware['cpu']['threads']} threads)")
+    console.print(
+        f"  CPU: {hardware['cpu']['model']} "
+        f"({hardware['cpu']['cores']} cores / "
+        f"{hardware['cpu']['threads']} threads)"
+    )
     console.print(f"  RAM: {hardware['ram_gb']} GB")
     if hardware['gpu']['type'] != 'none':
         console.print(f"  GPU: {hardware['gpu']['model']} ({hardware['gpu']['vram_gb']} GB VRAM)")
@@ -162,7 +204,12 @@ def publish():
     report["published"] = True
     # In production, this would POST to the Vercel API
     # For now, just update the local file
-    filepath = config.results_dir / f"{report['timestamp']}_{report['model']['name']}_{report['id']}.json"
+    fname = (
+        f"{report['timestamp']}_"
+        f"{report['model']['name']}_"
+        f"{report['id']}.json"
+    )
+    filepath = config.results_dir / fname
     import json
     filepath.write_text(json.dumps(report, indent=2))
 
@@ -186,7 +233,7 @@ def list_benchmarks():
 
 
 @cli.command()
-def list_models():
+def list_cli_models():
     """List all available models in the registry."""
     models = list_models()
     console.print("[bold]Available models:[/bold]")

@@ -45,7 +45,7 @@ class TestRegistry:
         assert len(llama_models) >= 2  # 3b-instruct, 8b-instruct, 70b-instruct
 
     def test_all_models_have_required_fields(self):
-        """test_all_models_have_required_fields: every model has repo, file_pattern, size_b, context."""
+        """Every model has repo, file_pattern, size_b, context."""
         required = ["repo", "file_pattern", "size_b", "context", "added"]
         for name in list_models():
             info = get_model_info(name)

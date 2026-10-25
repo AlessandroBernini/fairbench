@@ -165,7 +165,10 @@ def _benchmark_with_llama_cpp(
     try:
         from llama_cpp import Llama
     except ImportError:
-        console.print("[yellow]Warning: llama-cpp-python not available for speed benchmark.[/yellow]")
+        console.print(
+            "[yellow]Warning: llama-cpp-python not available "
+            "for speed benchmark.[/yellow]"
+        )
         return {"ttft_ms": 0.0, "tpot_ms": 0.0, "throughput": 0.0, "measured": False}
 
     try:
@@ -182,7 +185,7 @@ def _benchmark_with_llama_cpp(
         ttft_times = []
         for _ in range(3):  # Average over 3 runs
             start = time.perf_counter()
-            output = llm.create_chat_completion(
+            llm.create_chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1,
                 temperature=0,
@@ -197,7 +200,7 @@ def _benchmark_with_llama_cpp(
         throughput_times = []
         for _ in range(3):  # Average over 3 runs
             start = time.perf_counter()
-            output = llm.create_chat_completion(
+            llm.create_chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=n_tokens,
                 temperature=0.7,
@@ -277,7 +280,7 @@ def _load_model(model_path: Path, n_gpu_layers: int = -1) -> None:
         )
         return
 
-    model = Llama(
+    Llama(
         model_path=str(model_path),
         n_gpu_layers=n_gpu_layers,
         n_threads=0,
@@ -334,10 +337,11 @@ def benchmark_memory(
     # --- Load model ---
     try:
         _load_model(model_path, n_gpu_layers=n_gpu_layers)
-        loaded = True
     except Exception as e:
-        console.print(f"[yellow]Warning: model loading failed ({e}). Using baseline measurements.[/yellow]")
-        loaded = False
+        console.print(
+            f"[yellow]Warning: model loading failed ({e}). "
+            "Using baseline measurements.[/yellow]"
+        )
 
     # --- Peak measurements (after model load) ---
     after_used_mb, after_total_mb = (

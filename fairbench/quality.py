@@ -147,7 +147,6 @@ def run_quality_benchmark(
 
     # Try to import lm_eval
     try:
-        import lm_eval
         from lm_eval import Evaluator, tasks
     except ImportError:
         console.print(

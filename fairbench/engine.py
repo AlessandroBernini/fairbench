@@ -59,7 +59,11 @@ def run_benchmark(
     if console:
         console.print("\n[bold]Hardware:[/bold]")
         cpu = hardware['cpu']
-        console.print(f"  CPU: {cpu.get('model', 'unknown')} ({cpu.get('cores', '?')} cores / {cpu.get('threads', '?')} threads)")
+        console.print(
+            f"  CPU: {cpu.get('model', 'unknown')} "
+            f"({cpu.get('cores', '?')} cores / "
+            f"{cpu.get('threads', '?')} threads)"
+        )
         console.print(f"  RAM: {hardware['ram_gb']} GB")
         gpu = hardware['gpu']
         if gpu['type'] != 'none':
