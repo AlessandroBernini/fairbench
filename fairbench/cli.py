@@ -9,6 +9,7 @@ from fairbench.config import Config
 from fairbench.registry import get_model_info, list_models
 from fairbench.backend import detect_hardware
 from fairbench.reporter import Reporter
+from fairbench.engine import run_benchmark
 
 console = Console()
 
@@ -25,14 +26,39 @@ def cli():
 @click.option("--n-gpu-layers", "-ngl", default=None, help="Number of GPU layers (default: from config)")
 @click.option("--n-threads", "-t", default=None, help="Number of CPU threads (default: auto)")
 @click.option("--n-tokens", "-n", default=512, help="Number of tokens to generate (default: 512)")
+@click.option("--lite/--full", default=True, help="Use lite mode for quality benchmark (default: lite)")
 @click.option("--publish/--no-publish", "-p/-np", default=None, help="Publish to leaderboard (default: from config)")
-def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, publish: Optional[bool]):
+def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, lite: bool, publish):
     """Run a benchmark on the specified model."""
     config = Config()
 
     # Determine publish setting
     if publish is None:
         publish = config.publish_default
+
+    # Resolve model path
+    model_path = Path(model)
+    if not model_path.exists():
+        # Try to get from registry
+        model_info = get_model_info(model)
+        if model_info.get('repo'):
+            console.print(f"[yellow]Model '{model}' not found locally. Please download the GGUF first.[/yellow]")
+            console.print(f"  Source: {model_info['repo']}")
+            console.print(f"  File pattern: {model_info['file_pattern']}")
+            console.print(f"\n[bold]Download with:[/bold]")
+            console.print(f"  huggingface-cli download {model_info['repo']} {model_info['file_pattern']} --local-dir ~/.fairbench/models/")
+            return
+        else:
+            console.print(f"[red]Error: '{model}' not found and not in registry.[/red]")
+            return
+
+    # Determine GPU layers
+    if n_gpu_layers is None:
+        n_gpu_layers = config.default_n_gpu_layers
+
+    # Determine threads
+    if n_threads is None:
+        n_threads = config.default_threads
 
     # Detect hardware
     hardware = detect_hardware()
@@ -53,33 +79,26 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
     else:
         console.print(f"\n[bold blue]Model:[/bold blue] {model} (custom GGUF)")
 
-    # Run benchmarks (placeholder - will be implemented)
-    console.print("\n[bold yellow]Running benchmarks...[/bold yellow]")
-    console.print("  Quality (MMLU, HellaSwag, GSM8K)...")
-    console.print("  Speed (TTFT, TPOT, Throughput)...")
-    console.print("  Memory (VRAM, CPU RAM)...")
+    # Run benchmark via engine
+    console.print(f"\n[bold]Config:[/bold]")
+    console.print(f"  Quantization: {quant or config.default_quant}")
+    console.print(f"  GPU layers: {n_gpu_layers}")
+    console.print(f"  Threads: {n_threads}")
+    console.print(f"  Tokens: {n_tokens}")
+    console.print(f"  Lite mode: {'Yes' if lite else 'No'}")
+    console.print(f"  Publish: {'Yes' if publish else 'No'}")
 
-    # Generate report
-    reporter = Reporter(config.results_dir)
-    quality = {"mmlu": 0.0, "hellaswag": 0.0, "gsm8k": 0.0}  # Placeholder
-    speed = {"ttft_ms": 0.0, "tpot_ms": 0.0, "throughput": 0.0}  # Placeholder
-    memory = {"vram_peak_gb": 0.0, "cpu_ram_peak_gb": 0.0}  # Placeholder
-
-    report_path = reporter.generate_report(
+    report_path = run_benchmark(
+        model_path=model_path,
         model_name=model,
         quantization=quant or config.default_quant,
-        hardware=hardware,
-        quality=quality,
-        speed=speed,
-        memory=memory,
+        n_gpu_layers=n_gpu_layers,
+        n_threads=n_threads,
+        n_tokens=n_tokens,
+        lite=lite,
         publish=publish,
     )
-
     console.print(f"\n[bold green]Report saved:[/bold green] {report_path}")
-    if publish:
-        console.print(f"[bold green]Report published to leaderboard[/bold green]")
-    else:
-        console.print(f"[bold yellow]Report saved locally (not published)[/bold yellow]")
 
 
 @cli.command()
@@ -134,6 +153,19 @@ def publish():
     filepath.write_text(json.dumps(report, indent=2))
 
     console.print(f"[bold green]Report {report['id']} marked as published[/bold green]")
+
+
+@cli.command()
+def list_models():
+    """List all available models in the registry."""
+    models = list_models()
+    console.print("[bold]Available models:[/bold]")
+    for name in models:
+        info = get_model_info(name)
+        if info['repo']:
+            console.print(f"  {name} ({info['size_b']}B) - {info['repo']}")
+        else:
+            console.print(f"  {name} (custom)")
 
 
 def _print_report(report: dict):
