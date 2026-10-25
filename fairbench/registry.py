@@ -6,7 +6,7 @@ discovery script that proposes new models via PR.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any
 
 # Maximum age in days for a model to be included in the registry
 MAX_MODEL_AGE_DAYS = 365
@@ -24,7 +24,7 @@ def _is_model_fresh(created_at: str) -> bool:
 
 # Predefined models with their HuggingFace GGUF sources
 # All models are verified to be <1 year old at time of addition.
-MODEL_REGISTRY: dict[str, dict] = {
+MODEL_REGISTRY: dict[str, dict[str, Any]] = {
     "qwen2.5-7b-instruct": {
         "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
         "file_pattern": "qwen2.5-7b-instruct-q4_k_m.gguf",
@@ -77,7 +77,7 @@ MODEL_REGISTRY: dict[str, dict] = {
 }
 
 
-def get_model_info(model_name: str) -> dict:
+def get_model_info(model_name: str) -> dict[str, Any]:
     """Get model info from registry."""
     return MODEL_REGISTRY.get(model_name, MODEL_REGISTRY["custom"])
 

@@ -113,13 +113,14 @@ fairbench/
 - [x] Real VRAM/CPU RAM peak measurement via nvidia-smi + psutil
 - [x] Vercel API + Neon DB + leaderboard frontend
 - [x] Automatic publishing to public leaderboard
+- [x] Test suite (pytest) — 30+ tests across 7 modules
+- [x] GitHub Actions CI (pytest + ruff + mypy on Python 3.10/3.11/3.12)
+- [x] GitHub Actions release workflow (auto-publish to PyPI on main push)
+- [x] PyPI publish script (`scripts/publish.py`)
+- [x] Model discovery cron (weekly GitHub Actions → auto PR)
 
 ### 🔜 Next
 - [ ] **SWE-bench integration** — Real-world software engineering benchmark (fix actual GitHub issues)
-- [ ] Test suite (pytest)
-- [ ] GitHub Actions CI workflow
-- [ ] PyPI package publish
-- [ ] Model discovery automation (weekly cron)
 
 ## Contributing
 PRs welcome! See `CONTRIBUTING.md` for guidelines.

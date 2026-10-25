@@ -1,0 +1,49 @@
+name: Discover Models
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install huggingface_hub
+
+      - name: Run discovery script
+        run: python scripts/cron/discover_models.py
+
+      - name: Check for new models
+        run: |
+          if [ -f discovered/new-models-*.md ]; then
+            echo "New models discovered!"
+            cat discovered/new-models-*.md
+          else
+            echo "No new models found."
+          fi
+
+      - name: Create PR for new models
+        if: success()
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: add discovered models to registry"
+          title: "chore: new GGUF models discovered"
+          body: |
+            Automated model discovery found new GGUF models.
+            Review and merge to update the model registry.
+          branch: auto/new-models
+          base: main

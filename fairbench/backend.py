@@ -1,10 +1,10 @@
 """Backend for FairBench benchmarks."""
 
-import time
-import subprocess
 import json
+import subprocess
+import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any
 
 import psutil
 from rich.console import Console
@@ -12,7 +12,7 @@ from rich.console import Console
 console = Console()
 
 
-def detect_hardware() -> dict:
+def detect_hardware() -> dict[str, Any]:
     """Detect system hardware."""
     info = {
         "cpu": _get_cpu_info(),
@@ -23,7 +23,7 @@ def detect_hardware() -> dict:
     return info
 
 
-def _get_cpu_info() -> dict:
+def _get_cpu_info() -> dict[str, Any]:
     """Get CPU information."""
     return {
         "model": psutil.cpu_freq().current if psutil.cpu_freq() else "unknown",
@@ -32,7 +32,7 @@ def _get_cpu_info() -> dict:
     }
 
 
-def _get_gpu_info() -> dict:
+def _get_gpu_info() -> dict[str, Any]:
     """Get GPU information."""
     try:
         result = subprocess.run(
@@ -69,7 +69,7 @@ def benchmark_speed(
     n_tokens: int = 512,
     n_gpu_layers: int = -1,
     n_threads: int = 0,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark inference speed using llama-cpp-python.
 
     Measures TTFT (time to first token), TPOT (tokens per output token),
@@ -97,7 +97,7 @@ def benchmark_speed(
     try:
         result = _benchmark_with_llama_bench(model_path, prompt, n_tokens, n_gpu_layers, n_threads)
         if result.get("measured"):
-            console.print(f"  [bold green]llama-bench result:[/bold green]")
+            console.print("  [bold green]llama-bench result:[/bold green]")
             console.print(f"    TTFT: {result['ttft_ms']:.2f} ms")
             console.print(f"    TPOT: {result['tpot_ms']:.2f} ms")
             console.print(f"    Throughput: {result['throughput']:.2f} tok/s")
@@ -115,7 +115,7 @@ def _benchmark_with_llama_bench(
     n_tokens: int,
     n_gpu_layers: int,
     n_threads: int,
-) -> dict:
+) -> dict[str, Any]:
     """Try llama-bench CLI for speed measurement."""
     cmd = [
         "llama-bench",
@@ -161,12 +161,15 @@ def _benchmark_with_llama_cpp(
     n_tokens: int,
     n_gpu_layers: int,
     n_threads: int,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark using llama-cpp-python bindings with precise timing."""
     try:
         from llama_cpp import Llama
     except ImportError:
-        console.print("[yellow]Warning: llama-cpp-python not available for speed benchmark.[/yellow]")
+        console.print(
+            "[yellow]Warning: llama-cpp-python not available "
+            "for speed benchmark.[/yellow]"
+        )
         return {"ttft_ms": 0.0, "tpot_ms": 0.0, "throughput": 0.0, "measured": False}
 
     try:
@@ -183,7 +186,7 @@ def _benchmark_with_llama_cpp(
         ttft_times = []
         for _ in range(3):  # Average over 3 runs
             start = time.perf_counter()
-            output = llm.create_chat_completion(
+            llm.create_chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1,
                 temperature=0,
@@ -198,7 +201,7 @@ def _benchmark_with_llama_cpp(
         throughput_times = []
         for _ in range(3):  # Average over 3 runs
             start = time.perf_counter()
-            output = llm.create_chat_completion(
+            llm.create_chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=n_tokens,
                 temperature=0.7,
@@ -241,7 +244,7 @@ def _detect_gpu_available() -> bool:
         return False
 
 
-def _query_vram_usage() -> Tuple[float, float]:
+def _query_vram_usage() -> tuple[float, float]:
     """Query current VRAM usage in MB (used, total). Returns (used_mb, total_mb)."""
     try:
         result = subprocess.run(
@@ -278,7 +281,7 @@ def _load_model(model_path: Path, n_gpu_layers: int = -1) -> None:
         )
         return
 
-    model = Llama(
+    Llama(
         model_path=str(model_path),
         n_gpu_layers=n_gpu_layers,
         n_threads=0,
@@ -288,7 +291,7 @@ def _load_model(model_path: Path, n_gpu_layers: int = -1) -> None:
 def benchmark_memory(
     model_path: Path,
     n_gpu_layers: int = -1,
-) -> dict:
+) -> dict[str, Any]:
     """Benchmark memory usage of a loaded model.
 
     Measures VRAM peak (via nvidia-smi) and CPU RAM peak (via psutil)
@@ -335,10 +338,11 @@ def benchmark_memory(
     # --- Load model ---
     try:
         _load_model(model_path, n_gpu_layers=n_gpu_layers)
-        loaded = True
     except Exception as e:
-        console.print(f"[yellow]Warning: model loading failed ({e}). Using baseline measurements.[/yellow]")
-        loaded = False
+        console.print(
+            f"[yellow]Warning: model loading failed ({e}). "
+            "Using baseline measurements.[/yellow]"
+        )
 
     # --- Peak measurements (after model load) ---
     after_used_mb, after_total_mb = (

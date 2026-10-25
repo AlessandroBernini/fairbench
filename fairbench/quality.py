@@ -17,7 +17,6 @@ Supports 'lite' mode for faster evaluation on consumer hardware.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -148,7 +147,6 @@ def run_quality_benchmark(
 
     # Try to import lm_eval
     try:
-        import lm_eval
         from lm_eval import Evaluator, tasks
     except ImportError:
         console.print(
@@ -264,9 +262,9 @@ def get_available_tasks() -> list[str]:
     return list(BENCHMARK_INFO.keys())
 
 
-def get_task_info(task_name: str) -> dict:
+def get_task_info(task_name: str) -> dict[str, str | bool]:
     """Return metadata for a benchmark task."""
-    return BENCHMARK_INFO.get(task_name, {
+    return BENCHMARK_INFO.get(task_name, {  # type: ignore[return-value]
         "name": task_name,
         "description": "Unknown task",
         "type": "unknown",
