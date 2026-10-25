@@ -41,3 +41,6 @@ Thumbs.db
 
 # Ruff
 .ruff_cache/
+
+# PyPI publish
+.pypirc
