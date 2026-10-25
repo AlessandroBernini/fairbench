@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from fairbench.backend import detect_hardware, benchmark_speed, benchmark_memory
-from fairbench.quality import run_quality_benchmark
+from fairbench.quality import run_quality_benchmark, DEFAULT_TASKS
 from fairbench.reporter import Reporter
 from fairbench.config import Config
 
@@ -21,11 +21,14 @@ def run_benchmark(
     n_tokens: int = 512,
     lite: bool = True,
     publish: bool = True,
+    tasks: list[str] | None = None,
 ) -> Path:
     """Run a complete benchmark on the specified model.
 
-    Orchestrates quality (MMLU, HellaSwag, GSM8K), speed (TTFT, TPOT,
-    throughput), and memory (VRAM, CPU RAM) benchmarks.
+    Orchestrates quality, speed, and memory benchmarks. The quality
+    benchmark runs on a configurable set of tasks (not just MMLU,
+    HellaSwag, or GSM8K); when ``tasks`` is omitted, the default
+    suite (MMLU, HellaSwag, GSM8K) is used for backward compatibility.
 
     Args:
         model_path: Path to the GGUF model file.
@@ -36,6 +39,9 @@ def run_benchmark(
         n_tokens: Number of tokens to generate for speed benchmark.
         lite: Use lite mode for quality benchmark (faster).
         publish: Whether to publish results to the leaderboard.
+        tasks: Optional list of task names to run in the quality benchmark
+            (e.g., ['mmlu', 'humaneval', 'ifeval']). Defaults to
+            DEFAULT_TASKS when not provided.
 
     Returns:
         Path to the generated report file.
@@ -63,12 +69,16 @@ def run_benchmark(
             console.print("  GPU: None (CPU-only mode)")
         console.print(f"  OS: {hardware['os']}")
 
+    # Default tasks for backward compatibility
+    if tasks is None:
+        tasks = DEFAULT_TASKS
+
     # 1. Quality benchmark
     if console:
         console.print("\n" + "=" * 60)
     quality = run_quality_benchmark(
         model_path=model_path,
-        task_names_in=["mmlu", "hellaswag", "gsm8k"],
+        task_names_in=tasks,
         lite=lite,
         batch_size=4,
     )

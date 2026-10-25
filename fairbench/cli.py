@@ -10,6 +10,7 @@ from fairbench.registry import get_model_info, list_models
 from fairbench.backend import detect_hardware
 from fairbench.reporter import Reporter
 from fairbench.engine import run_benchmark
+from fairbench.quality import get_available_tasks, get_task_info, DEFAULT_TASKS
 
 console = Console()
 
@@ -27,10 +28,17 @@ def cli():
 @click.option("--n-threads", "-t", default=None, help="Number of CPU threads (default: auto)")
 @click.option("--n-tokens", "-n", default=512, help="Number of tokens to generate (default: 512)")
 @click.option("--lite/--full", default=True, help="Use lite mode for quality benchmark (default: lite)")
+@click.option("--tasks", "-t", default=None, help=f"Benchmarks to run (comma-separated). Default: {','.join(DEFAULT_TASKS)}. Available: {', '.join(get_available_tasks())}")
 @click.option("--publish/--no-publish", "-p/-np", default=None, help="Publish to leaderboard (default: from config)")
-def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, lite: bool, publish):
+def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, lite: bool, tasks: str, publish):
     """Run a benchmark on the specified model."""
     config = Config()
+
+    # Parse tasks from CLI
+    if tasks:
+        task_list = [t.strip() for t in tasks.split(",")]
+    else:
+        task_list = None  # Will default to DEFAULT_TASKS in engine
 
     # Determine publish setting
     if publish is None:
@@ -87,6 +95,10 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
     console.print(f"  Tokens: {n_tokens}")
     console.print(f"  Lite mode: {'Yes' if lite else 'No'}")
     console.print(f"  Publish: {'Yes' if publish else 'No'}")
+    if task_list:
+        console.print(f"  Tasks: {', '.join(task_list)}")
+    else:
+        console.print(f"  Tasks: {', '.join(DEFAULT_TASKS)} (default)")
 
     report_path = run_benchmark(
         model_path=model_path,
@@ -97,6 +109,7 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
         n_tokens=n_tokens,
         lite=lite,
         publish=publish,
+        tasks=task_list,
     )
     console.print(f"\n[bold green]Report saved:[/bold green] {report_path}")
 
@@ -153,6 +166,22 @@ def publish():
     filepath.write_text(json.dumps(report, indent=2))
 
     console.print(f"[bold green]Report {report['id']} marked as published[/bold green]")
+
+
+@cli.command()
+def list_benchmarks():
+    """List all available benchmark categories."""
+    console.print("[bold]Available benchmarks:[/bold]")
+    console.print(f"  {'Name':<15} {'Type':<20} {'Lite Mode'}")
+    console.print(f"  {'-'*15} {'-'*20} {'-'*30}")
+    for task in get_available_tasks():
+        info = get_task_info(task)
+        console.print(
+            f"  {info['name']:<15} {info['type']:<20} {info['lite']}"
+        )
+    console.print(f"\n[bold]Usage:[/bold]")
+    console.print(f"  fairbench run --model <model> --tasks mmlu,humaneval")
+    console.print(f"  Default tasks: {', '.join(DEFAULT_TASKS)}")
 
 
 @cli.command()
