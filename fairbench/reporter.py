@@ -98,7 +98,11 @@ class Reporter:
             })
         return reports
 
-    def get_leaderboard(self, model: str | None = None, gpu: str | None = None) -> list[dict[str, Any]]:
+    def get_leaderboard(
+        self,
+        model: str | None = None,
+        gpu: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Fetch leaderboard data from the API."""
         try:
             params = {}
