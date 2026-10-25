@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fairbench.engine import run_benchmark
+from fairbench.quality import DEFAULT_TASKS
 
 
 class TestRunBenchmark:
@@ -41,7 +42,8 @@ class TestRunBenchmark:
             # Verify quality was called with default tasks
             mock_quality.assert_called_once()
             call_kwargs = mock_quality.call_args
-            assert call_kwargs.kwargs["task_names_in"] is None or call_kwargs.args[1] is None
+            # engine.py converts None to DEFAULT_TASKS, so expect DEFAULT_TASKS
+            assert call_kwargs[1].get("task_names_in") == DEFAULT_TASKS
 
     def test_custom_tasks(self, mock_model_file: Path, mock_reporter):
         """run_benchmark uses custom tasks when specified."""
@@ -105,5 +107,4 @@ class TestRunBenchmark:
             assert result == Path("/tmp/report.json")
             # Verify publish=False was passed
             mock_reporter_instance.generate_report.assert_called_once()
-            call_kwargs = mock_reporter_instance.generate_report.call_args
-            assert call_kwargs.kwargs.get("publish") is False
+            assert mock_reporter_instance.generate_report.call_args[1].get("publish") is False

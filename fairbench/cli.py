@@ -28,7 +28,7 @@ def cli():
 @click.option("--n-threads", "-t", default=None, help="Number of CPU threads (default: auto)")
 @click.option("--n-tokens", "-n", default=512, help="Number of tokens to generate (default: 512)")
 @click.option("--lite/--full", default=True, help="Use lite mode for quality benchmark (default: lite)")
-@click.option("--tasks", "-t", default=None, help=f"Benchmarks to run (comma-separated). Default: {','.join(DEFAULT_TASKS)}. Available: {', '.join(get_available_tasks())}")
+@click.option("--tasks", default=None, help=f"Benchmarks to run (comma-separated). Default: {','.join(DEFAULT_TASKS)}. Available: {', '.join(get_available_tasks())}")
 @click.option("--publish/--no-publish", "-p/-np", default=None, help="Publish to leaderboard (default: from config)")
 def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int, lite: bool, tasks: str, publish):
     """Run a benchmark on the specified model."""
