@@ -23,8 +23,15 @@ class TestRunBenchmark:
                 "os": "Linux",
             }
             mock_quality.return_value = {"mmlu": 0.5}
-            mock_speed.return_value = {"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True}
-            mock_mem.return_value = {"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5}
+            mock_speed.return_value = {
+                "ttft_ms": 100.0, "tpot_ms": 5.0,
+                "throughput": 50.0, "measured": True
+            }
+            mock_mem.return_value = {
+                "vram_peak_gb": 4.0,
+                "cpu_ram_peak_gb": 8.0,
+                "model_file_size_gb": 3.5
+            }
 
             mock_reporter_instance = MagicMock()
             mock_reporter_instance.generate_report.return_value = Path("/tmp/report.json")
@@ -58,8 +65,15 @@ class TestRunBenchmark:
                 "os": "Linux",
             }
             mock_quality.return_value = {"humaneval": 0.3, "ifeval": 0.7}
-            mock_speed.return_value = {"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True}
-            mock_mem.return_value = {"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5}
+            mock_speed.return_value = {
+                "ttft_ms": 100.0, "tpot_ms": 5.0,
+                "throughput": 50.0, "measured": True
+            }
+            mock_mem.return_value = {
+                "vram_peak_gb": 4.0,
+                "cpu_ram_peak_gb": 8.0,
+                "model_file_size_gb": 3.5
+            }
 
             mock_reporter_instance = MagicMock()
             mock_reporter_instance.generate_report.return_value = Path("/tmp/report.json")
@@ -89,8 +103,15 @@ class TestRunBenchmark:
                 "os": "Linux",
             }
             mock_quality.return_value = {"mmlu": 0.5}
-            mock_speed.return_value = {"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True}
-            mock_mem.return_value = {"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5}
+            mock_speed.return_value = {
+                "ttft_ms": 100.0, "tpot_ms": 5.0,
+                "throughput": 50.0, "measured": True
+            }
+            mock_mem.return_value = {
+                "vram_peak_gb": 4.0,
+                "cpu_ram_peak_gb": 8.0,
+                "model_file_size_gb": 3.5
+            }
 
             mock_reporter_instance = MagicMock()
             mock_reporter_instance.generate_report.return_value = Path("/tmp/report.json")
