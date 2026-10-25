@@ -46,7 +46,17 @@ class SWEbenchInstance:
 
 @dataclass
 class SWEbenchStats:
-    """Aggregated SWE-bench statistics."""
+    """Aggregated SWE-bench statistics.
+
+    Attributes:
+        total_instances: Total number of instances evaluated.
+        resolved: Number of instances resolved.
+        failed: Number of instances that failed.
+        errors: Number of instances with errors.
+        avg_test_score: Average test score across instances.
+        per_repo: Per-repository resolution counts.
+        metadata: Additional metadata about the evaluation.
+    """
 
     total_instances: int = 0
     resolved: int = 0
