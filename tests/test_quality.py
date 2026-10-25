@@ -1,17 +1,14 @@
 """Tests for fairbench.quality module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from fairbench.quality import (
-    run_quality_benchmark,
-    get_available_tasks,
-    get_task_info,
-    DEFAULT_TASKS,
     ALL_TASKS,
     BENCHMARK_INFO,
+    DEFAULT_TASKS,
+    get_available_tasks,
+    get_task_info,
+    run_quality_benchmark,
 )
 
 

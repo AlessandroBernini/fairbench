@@ -17,7 +17,6 @@ Supports 'lite' mode for faster evaluation on consumer hardware.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 

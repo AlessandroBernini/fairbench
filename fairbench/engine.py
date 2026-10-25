@@ -4,12 +4,11 @@ Orchestrates quality, speed, and memory benchmarks for a given model.
 """
 
 from pathlib import Path
-from typing import Optional
 
-from fairbench.backend import detect_hardware, benchmark_speed, benchmark_memory
-from fairbench.quality import run_quality_benchmark, DEFAULT_TASKS
-from fairbench.reporter import Reporter
+from fairbench.backend import benchmark_memory, benchmark_speed, detect_hardware
 from fairbench.config import Config
+from fairbench.quality import DEFAULT_TASKS, run_quality_benchmark
+from fairbench.reporter import Reporter
 
 
 def run_benchmark(
@@ -58,7 +57,7 @@ def run_benchmark(
         console.print("\n[bold green]=== FairBench Benchmark ===[/bold green]")
     hardware = detect_hardware()
     if console:
-        console.print(f"\n[bold]Hardware:[/bold]")
+        console.print("\n[bold]Hardware:[/bold]")
         cpu = hardware['cpu']
         console.print(f"  CPU: {cpu.get('model', 'unknown')} ({cpu.get('cores', '?')} cores / {cpu.get('threads', '?')} threads)")
         console.print(f"  RAM: {hardware['ram_gb']} GB")
@@ -124,8 +123,8 @@ def run_benchmark(
     if console:
         console.print(f"\n[bold green]Report saved:[/bold green] {report_path}")
         if publish:
-            console.print(f"[bold green]Report published to leaderboard[/bold green]")
+            console.print("[bold green]Report published to leaderboard[/bold green]")
         else:
-            console.print(f"[bold yellow]Report saved locally (not published)[/bold yellow]")
+            console.print("[bold yellow]Report saved locally (not published)[/bold yellow]")
 
     return report_path

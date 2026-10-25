@@ -1,6 +1,5 @@
 """Tests for FairBench CLI."""
 
-import pytest
 from click.testing import CliRunner
 
 from fairbench.cli import cli

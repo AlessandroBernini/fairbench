@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from fairbench.engine import run_benchmark
 from fairbench.quality import DEFAULT_TASKS
 

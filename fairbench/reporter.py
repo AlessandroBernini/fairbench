@@ -2,10 +2,9 @@
 
 import json
 import uuid
-import hashlib
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
+
 import requests
 
 from fairbench.config import Config
@@ -14,7 +13,7 @@ from fairbench.config import Config
 class Reporter:
     """Generate and manage benchmark reports."""
 
-    def __init__(self, results_dir: Optional[Path] = None):
+    def __init__(self, results_dir: Path | None = None):
         config = Config()
         self.results_dir = results_dir or config.results_dir
         self.results_dir.mkdir(parents=True, exist_ok=True)
@@ -77,7 +76,7 @@ class Reporter:
             print(f"Warning: publish failed ({e})")
             return False
 
-    def get_latest(self) -> Optional[dict]:
+    def get_latest(self) -> dict | None:
         """Get the latest report."""
         files = sorted(self.results_dir.glob("*.json"))
         if not files:
@@ -98,7 +97,7 @@ class Reporter:
             })
         return reports
 
-    def get_leaderboard(self, model: Optional[str] = None, gpu: Optional[str] = None) -> list[dict]:
+    def get_leaderboard(self, model: str | None = None, gpu: str | None = None) -> list[dict]:
         """Fetch leaderboard data from the API."""
         try:
             params = {}

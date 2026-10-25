@@ -1,16 +1,17 @@
 """CLI for FairBench."""
 
-import click
 from pathlib import Path
+
+import click
 from rich.console import Console
 from rich.table import Table
 
-from fairbench.config import Config
-from fairbench.registry import get_model_info, list_models
 from fairbench.backend import detect_hardware
-from fairbench.reporter import Reporter
+from fairbench.config import Config
 from fairbench.engine import run_benchmark
-from fairbench.quality import get_available_tasks, get_task_info, DEFAULT_TASKS
+from fairbench.quality import DEFAULT_TASKS, get_available_tasks, get_task_info
+from fairbench.registry import get_model_info, list_models
+from fairbench.reporter import Reporter
 
 console = Console()
 
@@ -53,7 +54,7 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
             console.print(f"[yellow]Model '{model}' not found locally. Please download the GGUF first.[/yellow]")
             console.print(f"  Source: {model_info['repo']}")
             console.print(f"  File pattern: {model_info['file_pattern']}")
-            console.print(f"\n[bold]Download with:[/bold]")
+            console.print("\n[bold]Download with:[/bold]")
             console.print(f"  huggingface-cli download {model_info['repo']} {model_info['file_pattern']} --local-dir ~/.fairbench/models/")
             return
         else:
@@ -88,7 +89,7 @@ def run(model: str, quant: str, n_gpu_layers: int, n_threads: int, n_tokens: int
         console.print(f"\n[bold blue]Model:[/bold blue] {model} (custom GGUF)")
 
     # Run benchmark via engine
-    console.print(f"\n[bold]Config:[/bold]")
+    console.print("\n[bold]Config:[/bold]")
     console.print(f"  Quantization: {quant or config.default_quant}")
     console.print(f"  GPU layers: {n_gpu_layers}")
     console.print(f"  Threads: {n_threads}")
@@ -179,8 +180,8 @@ def list_benchmarks():
         console.print(
             f"  {info['name']:<15} {info['type']:<20} {info['lite']}"
         )
-    console.print(f"\n[bold]Usage:[/bold]")
-    console.print(f"  fairbench run --model <model> --tasks mmlu,humaneval")
+    console.print("\n[bold]Usage:[/bold]")
+    console.print("  fairbench run --model <model> --tasks mmlu,humaneval")
     console.print(f"  Default tasks: {', '.join(DEFAULT_TASKS)}")
 
 

@@ -1,7 +1,6 @@
 """Configuration for FairBench."""
 
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -9,7 +8,7 @@ import yaml
 class Config:
     """FairBench configuration."""
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         self.config_path = config_path or Path.home() / ".fairbench" / "config.yaml"
         self._ensure_config()
 

@@ -1,6 +1,6 @@
 """Tests for fairbench.registry module."""
 
-from fairbench.registry import list_models, get_model_info, MODEL_REGISTRY
+from fairbench.registry import get_model_info, list_models
 
 
 class TestRegistry:

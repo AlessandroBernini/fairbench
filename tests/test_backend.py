@@ -1,11 +1,10 @@
 """Tests for fairbench.backend module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fairbench.backend import detect_hardware, benchmark_memory
+from fairbench.backend import benchmark_memory, detect_hardware
 
 
 class TestDetectHardware:

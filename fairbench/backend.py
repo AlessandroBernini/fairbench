@@ -1,10 +1,9 @@
 """Backend for FairBench benchmarks."""
 
-import time
-import subprocess
 import json
+import subprocess
+import time
 from pathlib import Path
-from typing import Optional, Tuple
 
 import psutil
 from rich.console import Console
@@ -97,7 +96,7 @@ def benchmark_speed(
     try:
         result = _benchmark_with_llama_bench(model_path, prompt, n_tokens, n_gpu_layers, n_threads)
         if result.get("measured"):
-            console.print(f"  [bold green]llama-bench result:[/bold green]")
+            console.print("  [bold green]llama-bench result:[/bold green]")
             console.print(f"    TTFT: {result['ttft_ms']:.2f} ms")
             console.print(f"    TPOT: {result['tpot_ms']:.2f} ms")
             console.print(f"    Throughput: {result['throughput']:.2f} tok/s")
@@ -241,7 +240,7 @@ def _detect_gpu_available() -> bool:
         return False
 
 
-def _query_vram_usage() -> Tuple[float, float]:
+def _query_vram_usage() -> tuple[float, float]:
     """Query current VRAM usage in MB (used, total). Returns (used_mb, total_mb)."""
     try:
         result = subprocess.run(

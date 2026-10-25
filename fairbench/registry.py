@@ -6,7 +6,6 @@ discovery script that proposes new models via PR.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 
 # Maximum age in days for a model to be included in the registry
 MAX_MODEL_AGE_DAYS = 365
