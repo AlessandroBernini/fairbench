@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import time
-from pathlib import Path
 
-from fairbench.types import QualityResult, BenchmarkConfig, LiteMode
-
+from fairbench.types import BenchmarkConfig, LiteMode, QualityResult
 
 AVAILABLE_BENCHMARKS = {
     "mmlu": {
@@ -78,13 +75,16 @@ def run_quality_benchmark(
     # Check if lm_eval is available
     try:
         from lm_eval import simple_evaluate  # type: ignore
+
         has_lm_eval = True
     except ImportError:
         has_lm_eval = False
 
     if not has_lm_eval:
         # Graceful degradation
-        benchmarks_to_run = [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
+        benchmarks_to_run = (
+            [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
+        )
         if tasks:
             benchmarks_to_run = tasks
 
@@ -114,11 +114,7 @@ def run_quality_benchmark(
     elif lite_mode == LiteMode.DISABLED:
         pass  # Run all
     else:  # AUTO
-        lite_benchmarks = get_lite_benchmarks()
-        benchmarks_to_run = [
-            b if b in lite_benchmarks else b
-            for b in benchmarks_to_run
-        ]
+        pass  # No filtering; run all available benchmarks
 
     results = []
     for benchmark in benchmarks_to_run:
@@ -154,7 +150,7 @@ def run_quality_benchmark(
                 )
             )
             print(f"    Score: {score:.4f} ({items_correct}/{items_total}) in {elapsed:.1f}s")
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             print(f"    Error: {e}")
             results.append(
                 QualityResult(

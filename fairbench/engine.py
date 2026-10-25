@@ -2,28 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
-from fairbench.config import load_config, ensure_results_dir
+from fairbench.backend import benchmark_memory, benchmark_speed
+from fairbench.config import load_config
+from fairbench.data import DataManager
+from fairbench.quality import AVAILABLE_BENCHMARKS, get_lite_benchmarks, run_quality_benchmark
+from fairbench.reporter import Reporter
+from fairbench.swebench import SWEbenchClient
 from fairbench.types import (
     BenchmarkCategory,
     BenchmarkConfig,
     BenchmarkRun,
     LiteMode,
-    QualityResult,
-    SpeedResult,
-    MemoryResult,
-    SWEbenchResult,
 )
-from fairbench.swebench import SWEbenchClient, SWEbenchInstance, SWEbenchStats
-from fairbench.quality import run_quality_benchmark, AVAILABLE_BENCHMARKS, get_lite_benchmarks
-from fairbench.backend import benchmark_speed, benchmark_memory
-from fairbench.data import DataManager
-from fairbench.reporter import Reporter
 
 
 class BenchmarkEngine:
@@ -59,12 +53,14 @@ class BenchmarkEngine:
             lite_mode: Lite mode setting
         """
         n_ctx = n_ctx or self.config.default_n_ctx
-        n_gpu_layers = n_gpu_layers if n_gpu_layers is not None else self.config.default_n_gpu_layers
+        n_gpu_layers = (
+            n_gpu_layers if n_gpu_layers is not None else self.config.default_n_gpu_layers
+        )
         n_threads = n_threads if n_threads is not None else self.config.default_threads
         quantization = quantization or self.config.default_quant
         lite_mode_val = lite_mode or "auto"
 
-        print(f"\nFairBench v0.3.0")
+        print("\nFairBench v0.3.0")
         print(f"Model: {model_path}")
         print(f"Category: {category.value}")
         print(f"Context: {n_ctx}, GPU Layers: {n_gpu_layers}, Threads: {n_threads}")
@@ -82,8 +78,14 @@ class BenchmarkEngine:
         )
 
         # Run specified category
-        if category in (BenchmarkCategory.QUALITY, BenchmarkCategory.SPEED, BenchmarkCategory.MEMORY):
-            run = self._run_quality_speed_memory(run, model_path, tasks, n_ctx, n_gpu_layers, n_threads, lite_mode_val)
+        if category in (
+            BenchmarkCategory.QUALITY,
+            BenchmarkCategory.SPEED,
+            BenchmarkCategory.MEMORY,
+        ):
+            run = self._run_quality_speed_memory(
+                run, model_path, tasks, n_ctx, n_gpu_layers, n_threads, lite_mode_val
+            )
 
         if category == BenchmarkCategory.SWE_BENCH:
             run = self._run_swebench(run, model_path, lite_mode_val)
@@ -116,12 +118,16 @@ class BenchmarkEngine:
                 "throughput_avg": run.speed_result.throughput_avg if run.speed_result else 0,
                 "runs": run.speed_result.runs if run.speed_result else 0,
                 "metadata": run.speed_result.metadata if run.speed_result else {},
-            } if run.speed_result else None,
+            }
+            if run.speed_result
+            else None,
             "memory_result": {
                 "vram_peak_mb": run.memory_result.vram_peak_mb if run.memory_result else 0,
                 "ram_peak_mb": run.memory_result.ram_peak_mb if run.memory_result else 0,
                 "metadata": run.memory_result.metadata if run.memory_result else {},
-            } if run.memory_result else None,
+            }
+            if run.memory_result
+            else None,
             "swebench_results": [
                 {
                     "instance_id": r.instance_id,
@@ -142,7 +148,7 @@ class BenchmarkEngine:
             try:
                 self.reporter.publish_result(run_id, result_dict)
                 print("Result published to leaderboard")
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 print(f"Publish failed: {e}")
 
         return run
@@ -177,7 +183,9 @@ class BenchmarkEngine:
         run.quality_results = quality_results
 
         for result in quality_results:
-            print(f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})")
+            print(
+                f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})"
+            )
 
         # Speed
         print("\n[Speed Benchmark]")
@@ -242,6 +250,7 @@ class BenchmarkEngine:
     def list_swebench_splits(self) -> dict:
         """List available SWE-bench splits."""
         from fairbench.swebench import SWEBENCH_SOURCES
+
         return SWEBENCH_SOURCES
 
     def get_swebench_instances(

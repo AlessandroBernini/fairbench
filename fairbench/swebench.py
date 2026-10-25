@@ -15,9 +15,7 @@ This module provides:
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,12 +24,13 @@ from typing import Any
 import requests
 
 from fairbench.data import DataManager
-from fairbench.types import SWEbenchResult, BenchmarkConfig
+from fairbench.types import BenchmarkConfig, SWEbenchResult
 
 
 @dataclass
 class SWEbenchInstance:
     """A single SWE-bench instance."""
+
     instance_id: str
     repo: str
     base_commit: str
@@ -48,6 +47,7 @@ class SWEbenchInstance:
 @dataclass
 class SWEbenchStats:
     """Aggregated SWE-bench statistics."""
+
     total_instances: int = 0
     resolved: int = 0
     failed: int = 0
@@ -97,17 +97,17 @@ class SWEbenchClient:
         # Check cache first
         cache_key = f"swebench_instances_{split}"
         cached = self.data.get_cached_result("swebench", cache_key)
-        if cached:
+        if cached is not None and isinstance(cached, list):
             return [
                 SWEbenchInstance(
-                    instance_id=item["instance_id"],
-                    repo=item["repo"],
-                    base_commit=item["base_commit"],
+                    instance_id=str(item.get("instance_id", "")),
+                    repo=str(item.get("repo", "")),
+                    base_commit=str(item.get("base_commit", "")),
                     problem_id=item.get("problem_id"),
-                    hints_text=item.get("hints_text", ""),
-                    test_patch=item.get("test_patch", ""),
-                    code_language=item.get("code_language", "python"),
-                    version=item.get("version", "1.0"),
+                    hints_text=str(item.get("hints_text", "")),
+                    test_patch=str(item.get("test_patch", "")),
+                    code_language=str(item.get("code_language", "python")),
+                    version=str(item.get("version", "1.0")),
                 )
                 for item in (cached[:limit] if limit else cached)
             ]
@@ -194,10 +194,7 @@ class SWEbenchClient:
 
             all_ids = INSTANCE_IDS.get(split, [])
             if repo_filter:
-                all_ids = [
-                    iid for iid in all_ids
-                    if repo_filter in self._get_repo_from_id(iid)
-                ]
+                all_ids = [iid for iid in all_ids if repo_filter in self._get_repo_from_id(iid)]
 
             for iid in all_ids[:limit] if limit else all_ids:
                 instance = self.fetch_instance(iid, split)
@@ -253,11 +250,11 @@ class SWEbenchClient:
 
         Returns the generated patch text.
         """
-        from llama_cpp import Llama  # type: ignore
+        from llama_cpp import Llama  # type: ignore[import-untyped]
 
         prompt = self._build_swebench_prompt(instance)
 
-        llm = Llama(
+        llm = Llama(  # type: ignore[no-untyped-call]
             model_path=model_path,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -265,17 +262,19 @@ class SWEbenchClient:
             verbose=False,
         )
 
-        response = llm.create_completion(
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=0.2,
-            top_p=0.95,
-        )
-
-        llm.close()
+        try:
+            response = llm.create_completion(
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=0.2,
+                top_p=0.95,
+            )
+        finally:
+            llm.close()
 
         # Extract diff from response
-        patch = self._extract_patch(response["choices"][0]["text"])
+        text = response.get("choices", [{}])[0].get("text", "")  # type: ignore[union-attr]
+        patch = self._extract_patch(text)
         return patch
 
     def _build_swebench_prompt(self, instance: SWEbenchInstance) -> str:
@@ -345,41 +344,55 @@ Generate the patch:
         try:
             from swebench import (  # type: ignore
                 get_eval_report,
-                run_evaluation,
             )
 
             # Apply patch and run evaluation
             if apply_patch:
                 # Write patch to temp file
                 import tempfile
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".patch", delete=False
-                ) as f:
+
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
                     f.write(patch)
                     patch_file = f.name
 
-                # Run evaluation
-                report = get_eval_report(
-                    predictions=[{
-                        "instance_id": instance.instance_id,
-                        "model_patch": patch,
-                    }],
-                    model=instance.repo,
-                    lines_to_change=[],
-                    fail_to_pass=[],
-                    pass_to_pass=[],
-                )
+                try:
+                    # Run evaluation
+                    report = get_eval_report(
+                        predictions=[
+                            {
+                                "instance_id": instance.instance_id,
+                                "model_patch": patch,
+                            }
+                        ],
+                        model=instance.repo,
+                        lines_to_change=[],
+                        fail_to_pass=[],
+                        pass_to_pass=[],
+                    )
 
-                os.unlink(patch_file)
-
-                resolved = report.get("resolved", False)
+                    resolved = report.get("resolved", False)
+                    return SWEbenchResult(
+                        repo_name=instance.repo,
+                        instance_id=instance.instance_id,
+                        resolved=resolved,
+                        test_results=report,
+                        patch_applied=True,
+                        patch_success=resolved,
+                    )
+                finally:
+                    try:
+                        os.unlink(patch_file)
+                    except OSError:
+                        pass
+            else:
+                # No patch application requested, return basic result
                 return SWEbenchResult(
                     repo_name=instance.repo,
                     instance_id=instance.instance_id,
-                    resolved=resolved,
-                    test_results=report,
-                    patch_applied=True,
-                    patch_success=resolved,
+                    resolved=False,
+                    test_results={"method": "skip", "reason": "apply_patch=False"},
+                    patch_applied=False,
+                    patch_success=False,
                 )
         except ImportError:
             # Fallback: basic evaluation
@@ -393,7 +406,7 @@ Generate the patch:
                 patch_success=has_diff,
                 metadata={"note": "swebench library not installed, using basic evaluation"},
             )
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             return SWEbenchResult(
                 repo_name=instance.repo,
                 instance_id=instance.instance_id,
@@ -432,7 +445,7 @@ Generate the patch:
 
         results = []
         for i, instance in enumerate(instances):
-            print(f"  [{i+1}/{len(instances)}] {instance.instance_id} ({instance.repo})")
+            print(f"  [{i + 1}/{len(instances)}] {instance.instance_id} ({instance.repo})")
 
             start = time.time()
             try:
@@ -455,7 +468,7 @@ Generate the patch:
                 status = "RESOLVED" if result.resolved else "FAILED"
                 print(f"    [{status}] in {result.metadata.get('elapsed_seconds', 0):.1f}s")
 
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 print(f"    ERROR: {e}")
                 results.append(
                     SWEbenchResult(

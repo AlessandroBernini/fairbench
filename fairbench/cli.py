@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import click
-import json
-from pathlib import Path
-from typing import Any
 
 from fairbench.config import load_config, save_config
 from fairbench.engine import BenchmarkEngine
-from fairbench.types import BenchmarkCategory
 from fairbench.swebench import SWEBENCH_SOURCES
+from fairbench.types import BenchmarkCategory
 
 
 @click.group()
@@ -32,27 +29,52 @@ def cli(ctx, config_path):
 
 @cli.command()
 @click.argument("model_path")
-@click.option("--category", "-k", "category",
-              type=click.Choice(["quality", "speed", "memory", "swebench", "all"]),
-              default="all",
-              help="Benchmark category to run")
+@click.option(
+    "--category",
+    "-k",
+    "category",
+    type=click.Choice(["quality", "speed", "memory", "swebench", "all"]),
+    default="all",
+    help="Benchmark category to run",
+)
 @click.option("--tasks", "-t", "tasks", multiple=True, help="Specific quality benchmarks to run")
 @click.option("--n-ctx", "-n", default=None, type=int, help="Context window size")
 @click.option("--n-gpu-layers", "-g", default=None, type=int, help="GPU layers to offload")
 @click.option("--n-threads", "-j", default=None, type=int, help="CPU threads")
 @click.option("--quant", "-q", default=None, help="Quantization type")
 @click.option("--lite/--no-lite", default=None, help="Use lite mode for quality benchmarks")
-@click.option("--swebench-split", "-s", "swebench_split",
-              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
-              default=None,
-              help="SWE-bench split to use")
-@click.option("--swebench-limit", "-l", "swebench_limit",
-              type=int, default=None,
-              help="Limit SWE-bench instances")
+@click.option(
+    "--swebench-split",
+    "-s",
+    "swebench_split",
+    type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+    default=None,
+    help="SWE-bench split to use",
+)
+@click.option(
+    "--swebench-limit",
+    "-l",
+    "swebench_limit",
+    type=int,
+    default=None,
+    help="Limit SWE-bench instances",
+)
 @click.option("--publish/--no-publish", default=None, help="Override publish setting")
 @click.pass_context
-def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
-        quant, lite, swebench_split, swebench_limit, publish):
+def run(
+    ctx,
+    model_path,
+    category,
+    tasks,
+    n_ctx,
+    n_gpu_layers,
+    n_threads,
+    quant,
+    lite,
+    swebench_split,
+    swebench_limit,
+    publish,
+):
     """Run benchmarks on a model.
 
     MODEL_PATH is the path to the GGUF model file.
@@ -86,7 +108,7 @@ def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
     # Handle SWE-bench special cases
     if category == "swebench" or (category == "all" and swebench_split):
         lite_mode = "enabled" if lite else "disabled"
-        run = engine.run_benchmark(
+        engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.SWE_BENCH,
             n_ctx=n_ctx,
@@ -103,7 +125,7 @@ def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
 
     if category == "all":
         # Run all benchmarks
-        run = engine.run_benchmark(
+        engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.QUALITY,
             tasks=list(tasks) if tasks else None,
@@ -113,7 +135,7 @@ def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
             quantization=quant,
             lite_mode="enabled" if lite else "disabled",
         )
-        run = engine.run_benchmark(
+        engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.SPEED,
             n_ctx=n_ctx,
@@ -121,7 +143,7 @@ def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
             n_threads=n_threads,
             quantization=quant,
         )
-        run = engine.run_benchmark(
+        engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.MEMORY,
             n_ctx=n_ctx,
@@ -135,7 +157,7 @@ def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
         click.echo("Invalid category")
         return
 
-    run = engine.run_benchmark(
+    engine.run_benchmark(
         model_path=model_path,
         category=cat,
         tasks=list(tasks) if tasks else None,
@@ -164,10 +186,14 @@ def list_benchmarks(ctx):
 
 
 @cli.command("list-swebench")
-@click.option("--split", "-s", "split",
-              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
-              default="full",
-              help="SWE-bench split")
+@click.option(
+    "--split",
+    "-s",
+    "split",
+    type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+    default="full",
+    help="SWE-bench split",
+)
 @click.option("--limit", "-l", type=int, default=10, help="Number of instances to show")
 @click.pass_context
 def list_swebench(ctx, split, limit):
@@ -180,16 +206,22 @@ def list_swebench(ctx, split, limit):
     click.echo(f"  {'Instance ID':<35s} {'Repo':<25s} {'Language':<10s}")
     click.echo("-" * 70)
     for inst in instances:
-        click.echo(f"  {inst['instance_id']:<35s} {inst['repo']:<25s} {inst['code_language']:<10s}")
+        click.echo(
+            f"  {inst['instance_id']:<35s} {inst['repo']:<25s} {inst['code_language']:<10s}"
+        )
     click.echo()
 
 
 @cli.command("swebench-eval")
 @click.argument("model_path")
-@click.option("--split", "-s", "split",
-              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
-              default="full",
-              help="SWE-bench split")
+@click.option(
+    "--split",
+    "-s",
+    "split",
+    type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+    default="full",
+    help="SWE-bench split",
+)
 @click.option("--limit", "-l", type=int, default=5, help="Number of instances to evaluate")
 @click.option("--repo-filter", "-r", "repo_filter", help="Filter by repository")
 @click.pass_context
@@ -200,7 +232,7 @@ def swebench_eval(ctx, model_path, split, limit, repo_filter):
     """
     engine = BenchmarkEngine(ctx.obj["config"])
 
-    click.echo(f"\nSWE-bench Evaluation")
+    click.echo("\nSWE-bench Evaluation")
     click.echo(f"Model: {model_path}")
     click.echo(f"Split: {split}")
     click.echo(f"Limit: {limit}")
@@ -231,7 +263,7 @@ def swebench_eval(ctx, model_path, split, limit, repo_filter):
     # Show results
     stats = engine.swebench_client.compute_stats(results)
     click.echo(f"\n{'=' * 50}")
-    click.echo(f"Results:")
+    click.echo("Results:")
     click.echo(f"  Total: {stats.total_instances}")
     click.echo(f"  Resolved: {stats.resolved}")
     click.echo(f"  Failed: {stats.failed}")
@@ -312,9 +344,15 @@ def leaderboard(ctx, limit):
         speed = result.get("speed", {}).get("throughput_tokens_per_sec", 0)
         memory = result.get("memory", {}).get("vram_peak_mb", 0)
         swebench = result.get("swebench", {})
-        sweb_score = (swebench.get("resolved", 0) / swebench.get("total", 1) * 100) if swebench.get("total", 0) > 0 else 0
+        sweb_score = (
+            (swebench.get("resolved", 0) / swebench.get("total", 1) * 100)
+            if swebench.get("total", 0) > 0
+            else 0
+        )
 
-        click.echo(f"  {model:<30s} {avg_quality:<10.2f} {speed:<10.1f} {memory:<10.0f} {sweb_score:<10.1f}")
+        click.echo(
+            f"  {model:<30s} {avg_quality:<10.2f} {speed:<10.1f} {memory:<10.0f} {sweb_score:<10.1f}"
+        )
     click.echo()
 
 
@@ -323,7 +361,7 @@ def leaderboard(ctx, limit):
 @click.pass_context
 def results_cmd(ctx, category):
     """List local benchmark results."""
-    data = engine = BenchmarkEngine(ctx.obj["config"]).data
+    data = BenchmarkEngine(ctx.obj["config"]).data
     results = data.list_results()
 
     if not results:

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import time
 import os
-import psutil
 import subprocess
-from typing import Any
+import time
 
-from fairbench.types import SpeedResult, MemoryResult
+import psutil
+
+from fairbench.types import MemoryResult, SpeedResult
 
 
 def benchmark_speed(
@@ -24,12 +24,13 @@ def benchmark_speed(
     Falls back to llama-bench CLI if bindings unavailable.
     """
     try:
-        from llama_cpp import Llama  # type: ignore
-        return _benchmark_with_llama_cpp(
-            model_path, prompt, n_ctx, n_gpu_layers, n_threads, runs
-        )
+        from llama_cpp import Llama as _Llama  # type: ignore
     except ImportError:
         return _benchmark_with_llama_bench(model_path, prompt, runs)
+
+    return _benchmark_with_llama_cpp(
+        model_path, prompt, n_ctx, n_gpu_layers, n_threads, runs, _Llama
+    )
 
 
 def _benchmark_with_llama_cpp(
@@ -39,15 +40,16 @@ def _benchmark_with_llama_cpp(
     n_gpu_layers: int,
     n_threads: int,
     runs: int,
+    Llama: type,  # type: ignore[type-arg]
 ) -> SpeedResult:
     """Benchmark using llama-cpp-python directly."""
-    ttfts = []
-    tpots = []
-    throughputs = []
+    ttfts: list[float] = []
+    tpots: list[float] = []
+    throughputs: list[float] = []
 
     for i in range(runs):
         try:
-            llm = Llama(
+            llm = Llama(  # type: ignore[no-untyped-call]
                 model_path=model_path,
                 n_ctx=n_ctx,
                 n_gpu_layers=n_gpu_layers,
@@ -81,8 +83,8 @@ def _benchmark_with_llama_cpp(
             throughputs.append(throughput)
 
             llm.close()
-        except Exception as e:
-            print(f"    Run {i+1} failed: {e}")
+        except (OSError, RuntimeError) as e:
+            print(f"    Run {i + 1} failed: {e}")
 
     return SpeedResult(
         ttft_avg=sum(ttfts) / len(ttfts) if ttfts else 0.0,
@@ -97,14 +99,20 @@ def _benchmark_with_llama_bench(model_path: str, prompt: str, runs: int) -> Spee
     try:
         cmd = [
             "llama-bench",
-            "-m", model_path,
-            "-n", "512",
-            "-ngl", "0",
-            "-p", str(len(prompt.split())),
-            "-t", "0",
-            "-r", str(runs),
+            "-m",
+            model_path,
+            "-n",
+            "512",
+            "-ngl",
+            "0",
+            "-p",
+            str(len(prompt.split())),
+            "-t",
+            "0",
+            "-r",
+            str(runs),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=300)
         # Parse output - llama-bench format varies by version
         output = result.stdout
         return SpeedResult(runs=runs, metadata={"raw_output": output})
@@ -121,10 +129,18 @@ def benchmark_memory(
 ) -> MemoryResult:
     """Measure VRAM and RAM peak usage during inference."""
     try:
-        from llama_cpp import Llama  # type: ignore
-        return _measure_memory_llama_cpp(model_path, prompt, n_ctx, n_gpu_layers, n_threads)
+        from llama_cpp import Llama as _Llama  # type: ignore
     except ImportError:
         return MemoryResult(metadata={"reason": "llama-cpp-python not installed"})
+
+    return _measure_memory_llama_cpp(
+        model_path,
+        prompt,
+        n_ctx,
+        n_gpu_layers,
+        n_threads,
+        _Llama,  # type: ignore[arg-type]
+    )
 
 
 def _measure_memory_llama_cpp(
@@ -133,16 +149,17 @@ def _measure_memory_llama_cpp(
     n_ctx: int,
     n_gpu_layers: int,
     n_threads: int,
+    Llama: type,  # type: ignore[type-arg]
 ) -> MemoryResult:
     """Measure memory using llama-cpp-python with peak tracking."""
-    vram_samples = []
-    ram_samples = []
+    vram_samples: list[float] = []
+    ram_samples: list[float] = []
 
     try:
         # Get initial memory state
         initial_ram = psutil.Process().memory_info().rss
 
-        llm = Llama(
+        llm = Llama(  # type: ignore[no-untyped-call]
             model_path=model_path,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -153,14 +170,24 @@ def _measure_memory_llama_cpp(
         # Measure VRAM via nvidia-smi if available
         if os.path.exists("/usr/bin/nvidia-smi"):
             result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True
+                [
+                    "nvidia-smi",
+                    "--query-gpu=memory.used",
+                    "--format=csv,noheader,nounits",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
             )
             if result.returncode == 0:
-                vram_samples = [float(line.strip()) for line in result.stdout.strip().split("\n") if line.strip()]
+                vram_samples = [
+                    float(line.strip())
+                    for line in result.stdout.strip().split("\n")
+                    if line.strip()
+                ]
 
         # Run inference
-        response = llm.create_completion(
+        llm.create_completion(
             prompt=prompt,
             max_tokens=256,
             temperature=0.7,
@@ -176,9 +203,9 @@ def _measure_memory_llama_cpp(
         return MemoryResult(
             vram_peak_mb=sum(vram_samples) / len(vram_samples) if vram_samples else 0.0,
             ram_peak_mb=ram_peak,
-            vram_avg=sum(vram_samples) / len(vram_samples) if vram_samples else 0.0,
-            ram_avg=sum(ram_samples) / len(ram_samples) if ram_samples else 0.0,
+            vram_avg_mb=sum(vram_samples) / len(vram_samples) if vram_samples else 0.0,
+            ram_avg_mb=sum(ram_samples) / len(ram_samples) if ram_samples else 0.0,
             metadata={"model_size_gb": os.path.getsize(model_path) / (1024**3)},
         )
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         return MemoryResult(metadata={"error": str(e)})

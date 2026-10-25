@@ -1,18 +1,17 @@
 """Tests for SWE-bench integration."""
 
-import pytest
-import json
-import requests
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
+import pytest
+import requests
+
+from fairbench.data import DataManager
 from fairbench.swebench import (
+    SWEBENCH_SOURCES,
+    SWEbenchClient,
     SWEbenchInstance,
     SWEbenchStats,
-    SWEbenchClient,
-    SWEBENCH_SOURCES,
 )
-from fairbench.data import DataManager
 from fairbench.types import BenchmarkConfig, SWEbenchResult
 
 
@@ -171,31 +170,35 @@ class TestSWEbenchClientFetch:
 
     def test_fetch_instance_fallback_without_swebench(self, client):
         """Test fetch_instance falls back gracefully when swebench not installed."""
-        with patch.object(client.data, 'load_swebench_instance', return_value=None):
-            with patch('requests.get') as mock_get:
-                mock_get.return_value.raise_for_status = MagicMock()
-                mock_get.return_value.json.return_value = {
-                    "instance_id": "django-django-1",
-                    "repo": "django/django",
-                    "base_commit": "abc123",
-                    "hints_text": "",
-                    "test_patch": "",
-                    "code_language": "python",
-                    "version": "1.0",
-                }
+        with (
+            patch.object(client.data, "load_swebench_instance", return_value=None),
+            patch("requests.get") as mock_get,
+        ):
+            mock_get.return_value.raise_for_status = MagicMock()
+            mock_get.return_value.json.return_value = {
+                "instance_id": "django-django-1",
+                "repo": "django/django",
+                "base_commit": "abc123",
+                "hints_text": "",
+                "test_patch": "",
+                "code_language": "python",
+                "version": "1.0",
+            }
 
-                instance = client.fetch_instance("django-django-1", split="full")
-                assert instance is not None
-                assert instance.instance_id == "django-django-1"
+            instance = client.fetch_instance("django-django-1", split="full")
+            assert instance is not None
+            assert instance.instance_id == "django-django-1"
 
     def test_fetch_instance_returns_none_on_error(self, client):
         """Test fetch_instance returns None on network error."""
-        with patch.object(client.data, 'load_swebench_instance', return_value=None):
-            with patch('requests.get') as mock_get:
-                mock_get.side_effect = requests.RequestException("Network error")
+        with (
+            patch.object(client.data, "load_swebench_instance", return_value=None),
+            patch("requests.get") as mock_get,
+        ):
+            mock_get.side_effect = requests.RequestException("Network error")
 
-                instance = client.fetch_instance("django-django-1", split="full")
-                assert instance is None
+            instance = client.fetch_instance("django-django-1", split="full")
+            assert instance is None
 
 
 class TestSWEbenchClientEvaluate:
@@ -288,12 +291,12 @@ class TestSWEbenchIntegration:
         )
 
         # Generate patch (mocked)
-        with patch.object(client, 'generate_patch', return_value="diff --git a/test.py") as mock_gen:
+        with patch.object(client, "generate_patch", return_value="diff --git a/test.py"):
             generated = client.generate_patch(instance, "/dev/null/fake-model")
             assert "diff --git" in generated
 
         # Evaluate (mocked)
-        with patch.object(client, 'evaluate_instance') as mock_eval:
+        with patch.object(client, "evaluate_instance") as mock_eval:
             mock_eval.return_value = SWEbenchResult(
                 repo_name="test/repo",
                 instance_id="test-repo-test-1",

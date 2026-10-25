@@ -33,6 +33,7 @@ class LiteMode(Enum):
 @dataclass
 class QualityResult:
     """Results from quality benchmarks."""
+
     benchmark_name: str
     score: float
     items_total: int
@@ -43,6 +44,7 @@ class QualityResult:
 @dataclass
 class SpeedResult:
     """Results from speed benchmarks."""
+
     ttft_avg: float = 0.0  # Time to first token (ms)
     tpot_avg: float = 0.0  # Tokens per second
     throughput_avg: float = 0.0
@@ -53,6 +55,7 @@ class SpeedResult:
 @dataclass
 class MemoryResult:
     """Results from memory benchmarks."""
+
     vram_peak_mb: float = 0.0
     ram_peak_mb: float = 0.0
     vram_avg_mb: float = 0.0
@@ -63,6 +66,7 @@ class MemoryResult:
 @dataclass
 class SWEbenchResult:
     """Results from SWE-bench evaluation."""
+
     repo_name: str
     instance_id: str
     resolved: bool
@@ -75,6 +79,7 @@ class SWEbenchResult:
 @dataclass
 class BenchmarkRun:
     """Complete benchmark run results."""
+
     model_name: str
     model_path: str
     quantization: str
@@ -93,6 +98,7 @@ class BenchmarkRun:
 @dataclass
 class ModelInfo:
     """Model metadata."""
+
     name: str
     path: str
     quantization: str
@@ -106,6 +112,7 @@ class ModelInfo:
 @dataclass
 class BenchmarkConfig:
     """Benchmark configuration."""
+
     api_url: str = "https://fairbench.vercel.app/api"
     default_n_ctx: int = 4096
     default_n_gpu_layers: int = -1

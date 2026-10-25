@@ -64,7 +64,11 @@ class Reporter:
             lines.append("-" * 40)
             resolved = sum(1 for r in results["swebench_results"] if r.get("resolved"))
             total = len(results["swebench_results"])
-            lines.append(f"  Resolved: {resolved}/{total} ({resolved/total*100:.1f}%)" if total > 0 else "  No results")
+            lines.append(
+                f"  Resolved: {resolved}/{total} ({resolved / total * 100:.1f}%)"
+                if total > 0
+                else "  No results"
+            )
 
         lines.append(f"\n{'=' * 60}")
         return "\n".join(lines)
@@ -85,20 +89,23 @@ class Reporter:
             "timestamp": result["timestamp"],
             "category": result["category"],
             "quality_scores": {
-                qr["benchmark_name"]: qr["score"]
-                for qr in result.get("quality_results", [])
+                qr["benchmark_name"]: qr["score"] for qr in result.get("quality_results", [])
             },
             "speed": {
                 "ttft_ms": result.get("speed_result", {}).get("ttft_avg", 0),
                 "tpot_tokens_per_sec": result.get("speed_result", {}).get("tpot_avg", 0),
-                "throughput_tokens_per_sec": result.get("speed_result", {}).get("throughput_avg", 0),
+                "throughput_tokens_per_sec": result.get("speed_result", {}).get(
+                    "throughput_avg", 0
+                ),
             },
             "memory": {
                 "vram_peak_mb": result.get("memory_result", {}).get("vram_peak_mb", 0),
                 "ram_peak_mb": result.get("memory_result", {}).get("ram_peak_mb", 0),
             },
             "swebench": {
-                "resolved": sum(1 for r in result.get("swebench_results", []) if r.get("resolved")),
+                "resolved": sum(
+                    1 for r in result.get("swebench_results", []) if r.get("resolved")
+                ),
                 "total": len(result.get("swebench_results", [])),
             },
         }
@@ -110,7 +117,9 @@ class Reporter:
                 timeout=30,
             )
             response.raise_for_status()
-            return response.json()
+            resp_data = response.json()
+            assert isinstance(resp_data, dict)
+            return resp_data
         except requests.RequestException as e:
             print(f"Publish failed: {e}")
             return None
@@ -124,7 +133,9 @@ class Reporter:
                 timeout=30,
             )
             response.raise_for_status()
-            return response.json()
+            resp_data = response.json()
+            assert isinstance(resp_data, list)
+            return resp_data  # type: ignore[return-value]
         except requests.RequestException as e:
             print(f"Leaderboard fetch failed: {e}")
             return []

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import yaml
 
 from fairbench.types import BenchmarkConfig, LiteMode
 
-
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, str | int | float | bool] = {
     "api_url": "https://fairbench.vercel.app/api",
     "default_n_ctx": 4096,
     "default_n_gpu_layers": -1,
@@ -18,7 +16,7 @@ DEFAULT_CONFIG = {
     "default_threads": 0,
     "publish": True,
     "results_dir": "/home/jarvispi/.fairbench/results",
-}
+}  # type: ignore[dict-item]
 
 CONFIG_PATH = Path.home() / ".fairbench" / "config.yaml"
 
@@ -35,7 +33,9 @@ def load_config(path: str | None = None) -> BenchmarkConfig:
     return BenchmarkConfig(
         api_url=data.get("api_url", DEFAULT_CONFIG["api_url"]),
         default_n_ctx=data.get("default_n_ctx", DEFAULT_CONFIG["default_n_ctx"]),
-        default_n_gpu_layers=data.get("default_n_gpu_layers", DEFAULT_CONFIG["default_n_gpu_layers"]),
+        default_n_gpu_layers=data.get(
+            "default_n_gpu_layers", DEFAULT_CONFIG["default_n_gpu_layers"]
+        ),
         default_quant=data.get("default_quant", DEFAULT_CONFIG["default_quant"]),
         default_threads=data.get("default_threads", DEFAULT_CONFIG["default_threads"]),
         publish=data.get("publish", DEFAULT_CONFIG["publish"]),
@@ -77,13 +77,13 @@ def save_config(config: BenchmarkConfig, path: str | None = None) -> None:
 def _default_config() -> BenchmarkConfig:
     """Return default configuration."""
     return BenchmarkConfig(
-        api_url=DEFAULT_CONFIG["api_url"],
-        default_n_ctx=DEFAULT_CONFIG["default_n_ctx"],
-        default_n_gpu_layers=DEFAULT_CONFIG["default_n_gpu_layers"],
-        default_quant=DEFAULT_CONFIG["default_quant"],
-        default_threads=DEFAULT_CONFIG["default_threads"],
-        publish=DEFAULT_CONFIG["publish"],
-        results_dir=DEFAULT_CONFIG["results_dir"],
+        api_url=str(DEFAULT_CONFIG["api_url"]),
+        default_n_ctx=int(DEFAULT_CONFIG["default_n_ctx"]),
+        default_n_gpu_layers=int(DEFAULT_CONFIG["default_n_gpu_layers"]),
+        default_quant=str(DEFAULT_CONFIG["default_quant"]),
+        default_threads=int(DEFAULT_CONFIG["default_threads"]),
+        publish=bool(DEFAULT_CONFIG["publish"]),
+        results_dir=str(DEFAULT_CONFIG["results_dir"]),
     )
 
 

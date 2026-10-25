@@ -38,7 +38,9 @@ class DataManager:
             return None
 
         with open(filepath, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        assert isinstance(data, dict)
+        return data
 
     def list_results(self, category: str = "run") -> list[str]:
         """List all saved result IDs."""
@@ -60,7 +62,9 @@ class DataManager:
         if not filepath.exists():
             return None
         with open(filepath, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        assert isinstance(data, dict)
+        return data
 
     def get_model_hash(self, model_path: str) -> str:
         """Get SHA256 hash of model file for caching."""
@@ -70,8 +74,11 @@ class DataManager:
                 h.update(chunk)
         return h.hexdigest()
 
-    def get_cached_result(self, model_hash: str, benchmark: str) -> dict[str, Any] | None:
-        """Check if cached result exists for this model+benchmark."""
+    def get_cached_result(self, model_hash: str, benchmark: str) -> Any:
+        """Check if cached result exists for this model+benchmark.
+
+        Returns the cached data (dict, list, or scalar) or None if not found.
+        """
         cache_key = f"{model_hash}_{benchmark}"
         filepath = self.cache_dir / f"{cache_key}.json"
         if not filepath.exists():
@@ -79,7 +86,7 @@ class DataManager:
         with open(filepath, "r") as f:
             return json.load(f)
 
-    def save_cached_result(self, model_hash: str, benchmark: str, data: dict[str, Any]) -> None:
+    def save_cached_result(self, model_hash: str, benchmark: str, data: Any) -> None:
         """Save result to cache."""
         cache_key = f"{model_hash}_{benchmark}"
         filepath = self.cache_dir / f"{cache_key}.json"
