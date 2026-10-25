@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fairbench"
+name = "fair-bench"
 version = "0.2.0"
 description = "Fair benchmarking for local LLMs under 70B on consumer hardware"
 readme = "README.md"

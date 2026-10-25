@@ -4,7 +4,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="fairbench",
+    name="fair-bench",
     version="0.2.0",
     description="Fair benchmarking for local LLMs under 70B on consumer hardware",
     long_description=open("README.md").read(),
