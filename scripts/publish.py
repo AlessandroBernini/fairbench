@@ -34,15 +34,19 @@ def check_requirements():
     # Check .pypirc exists
     pypirc = ROOT / ".pypirc"
     if not pypirc.exists():
-        pypirc_example = ROOT / ".env.pypirc.example"
-        if pypirc_example.exists():
-            errors.append(
-                f".pypirc not found. Copy {pypirc_example} to .pypirc "
-                "and fill in your credentials."
-            )
+        home_pypirc = Path.home() / ".pypirc"
+        if home_pypirc.exists():
+            pypirc = home_pypirc
         else:
-            errors.append(".pypirc not found")
-        return errors, None
+            pypirc_example = ROOT / ".env.pypirc.example"
+            if pypirc_example.exists():
+                errors.append(
+                    f"~/.pypirc not found. Copy {pypirc_example} to ~/.pypirc "
+                    "and fill in your credentials."
+                )
+            else:
+                errors.append("~/.pypirc not found")
+            return errors, None
 
     # Check build dependencies
     for pkg in ["build", "twine"]:
@@ -89,8 +93,8 @@ def upload_package(dry_run=False):
 
     cmd = [
         sys.executable, "-m", "twine", "upload",
-        *files,
         "--repository", target,
+        str(dist_dir / "*"),
     ]
     if dry_run:
         cmd.append("--dry-run")
