@@ -1,275 +1,338 @@
 """CLI for FairBench."""
 
+from __future__ import annotations
+
+import click
+import json
 from pathlib import Path
 from typing import Any
 
-import click
-from rich.console import Console
-from rich.table import Table
-
-from fairbench.backend import detect_hardware
-from fairbench.config import Config
-from fairbench.engine import run_benchmark
-from fairbench.quality import DEFAULT_TASKS, get_available_tasks, get_task_info
-from fairbench.registry import get_model_info, list_models
-from fairbench.reporter import Reporter
-
-console = Console()
+from fairbench.config import load_config, save_config
+from fairbench.engine import BenchmarkEngine
+from fairbench.types import BenchmarkCategory
+from fairbench.swebench import SWEBENCH_SOURCES
 
 
 @click.group()
-def cli() -> None:
-    """FairBench - Fair benchmarking for local LLMs under 70B on consumer hardware."""
-    pass
+@click.version_option(version="0.3.0")
+@click.option("--config", "-c", "config_path", help="Path to config file", default=None)
+@click.pass_context
+def cli(ctx, config_path):
+    """FairBench - AI model benchmarking suite with SWE-bench integration.
+
+    FairBench evaluates AI models across multiple dimensions:
+    - Quality: MMLU, HellaSwag, GSM8K, HumanEval, IFEval, TruthfulQA, ARC-Challenge, LiveBench
+    - Speed: TTFT, TPOT, throughput
+    - Memory: VRAM and RAM peak usage
+    - SWE-bench: GitHub issue resolution capability
+    """
+    ctx.ensure_object(dict)
+    ctx.obj["config"] = load_config(config_path)
 
 
 @cli.command()
-@click.option("--model", "-m", required=True, help="Model name or GGUF path")
-@click.option("--quant", "-q", default=None, help="Quantization (default: from config)")
-@click.option(
-    "--n-gpu-layers", "-ngl",
-    default=None,
-    help="GPU layers (default: from config)"
-)
-@click.option(
-    "--n-threads", "-t",
-    default=None,
-    help="CPU threads (default: auto)"
-)
-@click.option(
-    "--n-tokens", "-n",
-    default=512,
-    help="Tokens to generate (default: 512)"
-)
-@click.option(
-    "--lite/--full",
-    default=True,
-    help="Lite mode for quality benchmark"
-)
-@click.option(
-    "--tasks",
-    default=None,
-    help=(
-        "Benchmarks to run (comma-separated). "
-        f"Default: {','.join(DEFAULT_TASKS)}. "
-        f"Available: {', '.join(get_available_tasks())}"
-    )
-)
-@click.option(
-    "--publish/--no-publish", "-p/-np",
-    default=None,
-    help="Publish to leaderboard (default: from config)"
-)
-def run(model: str, quant: str | None, n_gpu_layers: int | None,
-        n_threads: int | None, n_tokens: int,
-        lite: bool, tasks: str | None, publish: bool | None) -> None:
-    """Run a benchmark on the specified model."""
-    config = Config()
+@click.argument("model_path")
+@click.option("--category", "-k", "category",
+              type=click.Choice(["quality", "speed", "memory", "swebench", "all"]),
+              default="all",
+              help="Benchmark category to run")
+@click.option("--tasks", "-t", "tasks", multiple=True, help="Specific quality benchmarks to run")
+@click.option("--n-ctx", "-n", default=None, type=int, help="Context window size")
+@click.option("--n-gpu-layers", "-g", default=None, type=int, help="GPU layers to offload")
+@click.option("--n-threads", "-j", default=None, type=int, help="CPU threads")
+@click.option("--quant", "-q", default=None, help="Quantization type")
+@click.option("--lite/--no-lite", default=None, help="Use lite mode for quality benchmarks")
+@click.option("--swebench-split", "-s", "swebench_split",
+              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+              default=None,
+              help="SWE-bench split to use")
+@click.option("--swebench-limit", "-l", "swebench_limit",
+              type=int, default=None,
+              help="Limit SWE-bench instances")
+@click.option("--publish/--no-publish", default=None, help="Override publish setting")
+@click.pass_context
+def run(ctx, model_path, category, tasks, n_ctx, n_gpu_layers, n_threads,
+        quant, lite, swebench_split, swebench_limit, publish):
+    """Run benchmarks on a model.
 
-    # Parse tasks from CLI
-    if tasks:
-        task_list = [t.strip() for t in tasks.split(",")]
-    else:
-        task_list = None  # Will default to DEFAULT_TASKS in engine
+    MODEL_PATH is the path to the GGUF model file.
 
-    # Determine publish setting
-    if publish is None:
-        publish = config.publish_default
+    Examples:
+    \b
+    fairbench run ~/models/qwen3-35b-q4_k_m.gguf
+    fairbench run ~/models/model.gguf --category quality --tasks mmlu hellaswag
+    fairbench run ~/models/model.gguf --category swebench --swebench-split lite
+    fairbench run ~/models/model.gguf --category all --lite
+    """
+    config = ctx.obj["config"]
 
-    # Resolve model path
-    model_path = Path(model)
-    if not model_path.exists():
-        # Try to get from registry
-        model_info = get_model_info(model)
-        if model_info.get('repo'):
-            console.print(
-                f"[yellow]Model '{model}' not found locally. "
-                "Please download the GGUF first.[/yellow]"
-            )
-            console.print(f"  Source: {model_info['repo']}")
-            console.print(f"  File pattern: {model_info['file_pattern']}")
-            console.print("\n[bold]Download with:[/bold]")
-            console.print(
-                f"  huggingface-cli download "
-                f"{model_info['repo']} "
-                f"{model_info['file_pattern']} "
-                f"--local-dir ~/.fairbench/models/"
-            )
-            return
-        else:
-            console.print(f"[red]Error: '{model}' not found and not in registry.[/red]")
-            return
+    # Override publish setting if specified
+    if publish is not None:
+        config.publish = publish
 
-    # Determine GPU layers
-    if n_gpu_layers is None:
-        n_gpu_layers = config.default_n_gpu_layers
+    engine = BenchmarkEngine(config)
 
-    # Determine threads
-    if n_threads is None:
-        n_threads = config.default_threads
+    # Map category string to enum
+    category_map = {
+        "quality": BenchmarkCategory.QUALITY,
+        "speed": BenchmarkCategory.SPEED,
+        "memory": BenchmarkCategory.MEMORY,
+        "swebench": BenchmarkCategory.SWE_BENCH,
+        "all": None,  # Will run all
+    }
 
-    # Detect hardware
-    hardware = detect_hardware()
-    console.print("[bold green]Hardware detected:[/bold green]")
-    console.print(
-        f"  CPU: {hardware['cpu']['model']} "
-        f"({hardware['cpu']['cores']} cores / "
-        f"{hardware['cpu']['threads']} threads)"
-    )
-    console.print(f"  RAM: {hardware['ram_gb']} GB")
-    if hardware['gpu']['type'] != 'none':
-        console.print(f"  GPU: {hardware['gpu']['model']} ({hardware['gpu']['vram_gb']} GB VRAM)")
-    else:
-        console.print("  GPU: None (CPU-only mode)")
-    console.print(f"  OS: {hardware['os']}")
+    cat = category_map.get(category)
 
-    # Get model info
-    model_info = get_model_info(model)
-    if model_info['repo']:
-        console.print(f"\n[bold blue]Model:[/bold blue] {model} ({model_info['size_b']}B params)")
-        console.print(f"  Source: {model_info['repo']}")
-    else:
-        console.print(f"\n[bold blue]Model:[/bold blue] {model} (custom GGUF)")
-
-    # Run benchmark via engine
-    console.print("\n[bold]Config:[/bold]")
-    console.print(f"  Quantization: {quant or config.default_quant}")
-    console.print(f"  GPU layers: {n_gpu_layers}")
-    console.print(f"  Threads: {n_threads}")
-    console.print(f"  Tokens: {n_tokens}")
-    console.print(f"  Lite mode: {'Yes' if lite else 'No'}")
-    console.print(f"  Publish: {'Yes' if publish else 'No'}")
-    if task_list:
-        console.print(f"  Tasks: {', '.join(task_list)}")
-    else:
-        console.print(f"  Tasks: {', '.join(DEFAULT_TASKS)} (default)")
-
-    report_path = run_benchmark(
-        model_path=model_path,
-        model_name=model,
-        quantization=quant or config.default_quant,
-        n_gpu_layers=n_gpu_layers,
-        n_threads=n_threads,
-        n_tokens=n_tokens,
-        lite=lite,
-        publish=publish,
-        tasks=task_list,
-    )
-    console.print(f"\n[bold green]Report saved:[/bold green] {report_path}")
-
-
-@cli.command()
-@click.option("--latest", "-l", is_flag=True, help="Show latest report")
-def report(latest: bool) -> None:
-    """View benchmark reports."""
-    config = Config()
-    reporter = Reporter(config.results_dir)
-
-    if latest:
-        report = reporter.get_latest()
-        if report:
-            _print_report(report)
-        else:
-            console.print("[yellow]No reports found.[/yellow]")
-    else:
-        reports = reporter.list_reports()
-        if reports:
-            table = Table(title="FairBench Reports")
-            table.add_column("ID")
-            table.add_column("Timestamp")
-            table.add_column("Model")
-            table.add_column("Published")
-            for r in reports:
-                table.add_row(
-                    r["id"],
-                    r["timestamp"],
-                    r["model"],
-                    "Yes" if r["published"] else "No"
-                )
-            console.print(table)
-        else:
-            console.print("[yellow]No reports found.[/yellow]")
-
-
-@cli.command()
-def publish() -> None:
-    """Publish latest report to leaderboard."""
-    config = Config()
-    reporter = Reporter(config.results_dir)
-
-    report = reporter.get_latest()
-    if not report:
-        console.print("[yellow]No reports to publish.[/yellow]")
+    # Handle SWE-bench special cases
+    if category == "swebench" or (category == "all" and swebench_split):
+        lite_mode = "enabled" if lite else "disabled"
+        run = engine.run_benchmark(
+            model_path=model_path,
+            category=BenchmarkCategory.SWE_BENCH,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            n_threads=n_threads,
+            quantization=quant,
+            lite_mode=lite_mode,
+        )
+        # Override split if specified
+        if swebench_split:
+            engine.swebench_client.config = config
+            engine.swebench_client.config.swebench_split = swebench_split
         return
 
-    report["published"] = True
-    # In production, this would POST to the Vercel API
-    # For now, just update the local file
-    fname = (
-        f"{report['timestamp']}_"
-        f"{report['model']['name']}_"
-        f"{report['id']}.json"
-    )
-    filepath = config.results_dir / fname
-    import json
-    filepath.write_text(json.dumps(report, indent=2))
-
-    console.print(f"[bold green]Report {report['id']} marked as published[/bold green]")
-
-
-@cli.command()
-def list_benchmarks() -> None:
-    """List all available benchmark categories."""
-    console.print("[bold]Available benchmarks:[/bold]")
-    console.print(f"  {'Name':<15} {'Type':<20} {'Lite Mode'}")
-    console.print(f"  {'-'*15} {'-'*20} {'-'*30}")
-    for task in get_available_tasks():
-        info = get_task_info(task)
-        console.print(
-            f"  {info['name']:<15} {info['type']:<20} {info['lite']}"
+    if category == "all":
+        # Run all benchmarks
+        run = engine.run_benchmark(
+            model_path=model_path,
+            category=BenchmarkCategory.QUALITY,
+            tasks=list(tasks) if tasks else None,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            n_threads=n_threads,
+            quantization=quant,
+            lite_mode="enabled" if lite else "disabled",
         )
-    console.print("\n[bold]Usage:[/bold]")
-    console.print("  fairbench run --model <model> --tasks mmlu,humaneval")
-    console.print(f"  Default tasks: {', '.join(DEFAULT_TASKS)}")
+        run = engine.run_benchmark(
+            model_path=model_path,
+            category=BenchmarkCategory.SPEED,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            n_threads=n_threads,
+            quantization=quant,
+        )
+        run = engine.run_benchmark(
+            model_path=model_path,
+            category=BenchmarkCategory.MEMORY,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            n_threads=n_threads,
+            quantization=quant,
+        )
+        return
+
+    if cat is None:
+        click.echo("Invalid category")
+        return
+
+    run = engine.run_benchmark(
+        model_path=model_path,
+        category=cat,
+        tasks=list(tasks) if tasks else None,
+        n_ctx=n_ctx,
+        n_gpu_layers=n_gpu_layers,
+        n_threads=n_threads,
+        quantization=quant,
+        lite_mode="enabled" if lite else "disabled",
+    )
 
 
-@cli.command()
-def list_cli_models() -> None:
-    """List all available models in the registry."""
-    models = list_models()
-    console.print("[bold]Available models:[/bold]")
-    for name in models:
-        info = get_model_info(name)
-        if info['repo']:
-            console.print(f"  {name} ({info['size_b']}B) - {info['repo']}")
-        else:
-            console.print(f"  {name} (custom)")
+@cli.command("list-benchmarks")
+@click.pass_context
+def list_benchmarks(ctx):
+    """List available quality benchmarks."""
+    engine = BenchmarkEngine(ctx.obj["config"])
+    benchmarks = engine.list_available_benchmarks()
+
+    click.echo("\nAvailable Quality Benchmarks:")
+    click.echo("-" * 50)
+    for name, info in benchmarks.items():
+        lite_marker = " [lite]" if info.get("lite") else ""
+        click.echo(f"  {name:20s} {info['name']:25s}{lite_marker}")
+        click.echo(f"    {info['description']}")
+    click.echo()
 
 
-def _print_report(report: dict[str, Any]) -> None:
-    """Print a formatted report."""
-    console.print(f"\n[bold]Report: {report['id']}[/bold]")
-    console.print(f"Timestamp: {report['timestamp']}")
-    console.print(f"Model: {report['model']['name']} ({report['model']['quantization']})")
+@cli.command("list-swebench")
+@click.option("--split", "-s", "split",
+              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+              default="full",
+              help="SWE-bench split")
+@click.option("--limit", "-l", type=int, default=10, help="Number of instances to show")
+@click.pass_context
+def list_swebench(ctx, split, limit):
+    """List available SWE-bench instances."""
+    engine = BenchmarkEngine(ctx.obj["config"])
+    instances = engine.get_swebench_instances(split=split, limit=limit)
 
-    console.print("\n[bold]Hardware:[/bold]")
-    hw = report['hardware']
-    console.print(f"  CPU: {hw['cpu']['model']}")
-    console.print(f"  RAM: {hw['ram_gb']} GB")
-    if hw['gpu']['type'] != 'none':
-        console.print(f"  GPU: {hw['gpu']['model']} ({hw['gpu']['vram_gb']} GB)")
+    click.echo(f"\nSWE-bench '{split}' instances (showing {len(instances)}):")
+    click.echo("-" * 70)
+    click.echo(f"  {'Instance ID':<35s} {'Repo':<25s} {'Language':<10s}")
+    click.echo("-" * 70)
+    for inst in instances:
+        click.echo(f"  {inst['instance_id']:<35s} {inst['repo']:<25s} {inst['code_language']:<10s}")
+    click.echo()
 
-    console.print("\n[bold]Quality:[/bold]")
-    for k, v in report['quality'].items():
-        console.print(f"  {k}: {v:.3f}")
 
-    console.print("\n[bold]Speed:[/bold]")
-    for k, v in report['speed'].items():
-        console.print(f"  {k}: {v:.2f}")
+@cli.command("swebench-eval")
+@click.argument("model_path")
+@click.option("--split", "-s", "split",
+              type=click.Choice(list(SWEBENCH_SOURCES.keys())),
+              default="full",
+              help="SWE-bench split")
+@click.option("--limit", "-l", type=int, default=5, help="Number of instances to evaluate")
+@click.option("--repo-filter", "-r", "repo_filter", help="Filter by repository")
+@click.pass_context
+def swebench_eval(ctx, model_path, split, limit, repo_filter):
+    """Run SWE-bench evaluation on a model.
 
-    console.print("\n[bold]Memory:[/bold]")
-    for k, v in report['memory'].items():
-        console.print(f"  {k}: {v:.2f} GB")
+    MODEL_PATH is the path to the GGUF model file.
+    """
+    engine = BenchmarkEngine(ctx.obj["config"])
+
+    click.echo(f"\nSWE-bench Evaluation")
+    click.echo(f"Model: {model_path}")
+    click.echo(f"Split: {split}")
+    click.echo(f"Limit: {limit}")
+    if repo_filter:
+        click.echo(f"Repo filter: {repo_filter}")
+
+    # Fetch instances
+    instances = engine.swebench_client.fetch_instances(
+        split=split,
+        limit=limit,
+        repo_filter=repo_filter,
+    )
+
+    if not instances:
+        click.echo("No instances available")
+        return
+
+    click.echo(f"\nFound {len(instances)} instances")
+
+    # Run evaluation
+    results = engine.swebench_client.run_evaluation(
+        model_path=model_path,
+        instances=instances,
+        split=split,
+        limit=limit,
+    )
+
+    # Show results
+    stats = engine.swebench_client.compute_stats(results)
+    click.echo(f"\n{'=' * 50}")
+    click.echo(f"Results:")
+    click.echo(f"  Total: {stats.total_instances}")
+    click.echo(f"  Resolved: {stats.resolved}")
+    click.echo(f"  Failed: {stats.failed}")
+    click.echo(f"  Errors: {stats.errors}")
+    click.echo(f"  Score: {stats.avg_test_score:.1f}%")
+    click.echo(f"{'=' * 50}")
+
+
+@cli.command("config")
+@click.option("--show", "-s", "show", is_flag=True, help="Show current config")
+@click.option("--set", "-S", "set_kv", multiple=True, help="Set config key=value")
+@click.pass_context
+def config_cmd(ctx, show, set_kv):
+    """Manage FairBench configuration."""
+    config = ctx.obj["config"]
+
+    if show:
+        click.echo("\nCurrent Configuration:")
+        click.echo("-" * 40)
+        for key, value in config.__dict__.items():
+            click.echo(f"  {key}: {value}")
+        click.echo()
+        return
+
+    if set_kv:
+        for kv in set_kv:
+            if "=" not in kv:
+                click.echo(f"Invalid key=value: {kv}")
+                continue
+            key, value = kv.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+
+            # Parse value types
+            if value.lower() in ("true", "false"):
+                value = value.lower() == "true"
+            else:
+                try:
+                    value = int(value)
+                except ValueError:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass  # Keep as string
+
+            if hasattr(config, key):
+                setattr(config, key, value)
+                click.echo(f"Set {key} = {value}")
+            else:
+                click.echo(f"Unknown config key: {key}")
+
+        # Save config
+        save_config(config)
+        click.echo("\nConfig saved")
+
+
+@cli.command("leaderboard")
+@click.option("--limit", "-l", type=int, default=20, help="Number of results to show")
+@click.pass_context
+def leaderboard(ctx, limit):
+    """Show the leaderboard."""
+    engine = BenchmarkEngine(ctx.obj["config"])
+    results = engine.reporter.get_leaderboard(limit=limit)
+
+    if not results:
+        click.echo("No results available")
+        return
+
+    click.echo("\nLeaderboard:")
+    click.echo("-" * 80)
+    click.echo(f"  {'Model':<30s} {'Quality':<10s} {'Speed':<10s} {'Memory':<10s} {'SWE':<10s}")
+    click.echo("-" * 80)
+
+    for result in results:
+        model = result.get("model_name", "unknown")[:30]
+        quality = result.get("quality_scores", {})
+        avg_quality = sum(quality.values()) / len(quality) if quality else 0
+        speed = result.get("speed", {}).get("throughput_tokens_per_sec", 0)
+        memory = result.get("memory", {}).get("vram_peak_mb", 0)
+        swebench = result.get("swebench", {})
+        sweb_score = (swebench.get("resolved", 0) / swebench.get("total", 1) * 100) if swebench.get("total", 0) > 0 else 0
+
+        click.echo(f"  {model:<30s} {avg_quality:<10.2f} {speed:<10.1f} {memory:<10.0f} {sweb_score:<10.1f}")
+    click.echo()
+
+
+@cli.command("results")
+@click.option("--category", "-c", help="Filter by category")
+@click.pass_context
+def results_cmd(ctx, category):
+    """List local benchmark results."""
+    data = engine = BenchmarkEngine(ctx.obj["config"]).data
+    results = data.list_results()
+
+    if not results:
+        click.echo("No local results")
+        return
+
+    click.echo(f"\nLocal results ({len(results)}):")
+    for r in results:
+        click.echo(f"  {r}")
 
 
 if __name__ == "__main__":

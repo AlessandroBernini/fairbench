@@ -1,46 +1,13 @@
-# Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg
+*.pyc
 *.egg-info/
 dist/
 build/
 .eggs/
-*.whl
-
-# Virtual environments
-venv/
-.venv/
-env/
+*.egg
 .env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Config
-.fairbench/
-*.local.yaml
-
-# Results
-.fairbench/
-
-# Vercel
-.vercel
-
-# MyPy
-.mypy_cache/
-
-# Ruff
-.ruff_cache/
-
-# PyPI publish
-.pypirc
+.venv/
+venv/
+.fairbench/results/*.json
+fairbench/data/swebench/
+fairbench/tests/__pycache__/
