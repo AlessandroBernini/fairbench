@@ -113,7 +113,7 @@ results_dir: ~/.fairbench/results
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `api_url` | `https://fairbench.vercel.app/api` | Leaderboard API endpoint |
+| `api_url` | `https://fairbench.vercel.app/api` | Leaderboard API endpoint. Note: `vercel.app` may require Vercel SSO login on first access; this is a Vercel free-tier behavior, not a configuration issue. |
 | `default_n_ctx` | `4096` | Default context window size |
 | `default_n_gpu_layers` | `-1` | GPU offload layers (-1 = all) |
 | `default_quant` | `q4_k_m` | Default quantization type |

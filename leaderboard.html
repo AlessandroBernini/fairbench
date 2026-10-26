@@ -39,13 +39,8 @@
     </div>
 
     <!-- Filters -->
-    <div class="flex gap-2 mb-6 flex-wrap">
-      <button class="filter-btn active" onclick="filterBy('all')">All</button>
-      <button class="filter-btn" onclick="filterBy('nvidia')">NVIDIA</button>
-      <button class="filter-btn" onclick="filterBy('cpu')">CPU Only</button>
-      <button class="filter-btn" onclick="filterBy('qwen')">Qwen</button>
-      <button class="filter-btn" onclick="filterBy('llama')">Llama</button>
-      <button class="filter-btn" onclick="filterBy('mistral')">Mistral</button>
+    <div class="flex gap-2 mb-6 flex-wrap" id="filters-container">
+      <button class="filter-btn active" data-filter="all">All</button>
     </div>
 
     <!-- Stats -->
@@ -59,7 +54,7 @@
         <div class="text-2xl font-bold stat" id="total-models">—</div>
       </div>
       <div class="card p-4 rounded-lg">
-        <div class="text-gray-500 text-sm">Unique GPUs</div>
+        <div class="text-gray-500 text-sm">GPU Types</div>
         <div class="text-2xl font-bold stat" id="total-gpus">—</div>
       </div>
       <div class="card p-4 rounded-lg">
@@ -104,6 +99,7 @@
 
   <script>
     let allReports = [];
+    let activeFilter = 'all';
 
     async function loadReports() {
       try {
@@ -112,10 +108,56 @@
         allReports = data.reports || [];
         renderLeaderboard(allReports);
         updateStats(allReports);
+        renderFilters(allReports);
       } catch (e) {
         document.getElementById('leaderboard-body').innerHTML = 
           '<tr><td colspan="10" class="text-center py-8 text-red-400">Failed to load leaderboard</td></tr>';
       }
+    }
+
+    function renderFilters(reports) {
+      const container = document.getElementById('filters-container');
+      const modelNames = new Set();
+      
+      reports.forEach(r => {
+        const name = r.model_name.toLowerCase();
+        // Extract model family prefix
+        if (name.includes('qwen')) modelNames.add('qwen');
+        if (name.includes('llama')) modelNames.add('llama');
+        if (name.includes('mistral')) modelNames.add('mistral');
+        if (name.includes('gemma')) modelNames.add('gemma');
+        if (name.includes('phi')) modelNames.add('phi');
+        if (name.includes('deepseek')) modelNames.add('deepseek');
+      });
+
+      // Always keep NVIDIA and CPU filters
+      const hasNvidia = reports.some(r => r.gpu_type === 'nvidia');
+      const hasCpu = reports.some(r => r.gpu_type === 'none');
+
+      let filters = [{ key: 'all', label: 'All' }];
+      
+      if (hasNvidia) filters.push({ key: 'nvidia', label: 'NVIDIA' });
+      if (hasCpu) filters.push({ key: 'cpu', label: 'CPU' });
+      
+      // Sort model families alphabetically for consistency
+      const sortedModels = Array.from(modelNames).sort();
+      for (const model of sortedModels) {
+        filters.push({ key: model, label: model.charAt(0).toUpperCase() + model.slice(1) });
+      }
+
+      container.innerHTML = filters.map(f => 
+        `<button class="filter-btn ${f.key === activeFilter ? 'active' : ''}" data-filter="${f.key}">${f.label}</button>`
+      ).join('');
+
+      // Re-attach click listeners
+      container.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.filter;
+          container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          applyFilter();
+        });
+      });
     }
 
     function renderLeaderboard(reports) {
@@ -163,34 +205,20 @@
       document.getElementById('avg-throughput').textContent = avg + ' tok/s';
     }
 
-    function filterBy(type) {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
-
+    function applyFilter() {
       let filtered;
-      switch (type) {
+      switch (activeFilter) {
         case 'nvidia':
           filtered = allReports.filter(r => r.gpu_type === 'nvidia');
           break;
         case 'cpu':
           filtered = allReports.filter(r => r.gpu_type === 'none');
           break;
-        case 'qwen':
-          filtered = allReports.filter(r => r.model_name.toLowerCase().includes('qwen'));
-          break;
-        case 'llama':
-          filtered = allReports.filter(r => r.model_name.toLowerCase().includes('llama'));
-          break;
-        case 'mistral':
-          filtered = allReports.filter(r => r.model_name.toLowerCase().includes('mistral'));
-          break;
         default:
-          filtered = allReports;
+          filtered = allReports.filter(r => r.model_name.toLowerCase().includes(activeFilter));
       }
       renderLeaderboard(filtered);
     }
-
-    loadReports();
   </script>
 </body>
 </html>
