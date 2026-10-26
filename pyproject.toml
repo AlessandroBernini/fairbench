@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fair-bench"
+name = "fairbench-ai"
 version = "0.3.0"
 description = "FairBench - AI model benchmarking suite with SWE-bench integration"
 readme = "README.md"
