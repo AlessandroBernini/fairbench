@@ -18,12 +18,12 @@ def test_run_command_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["run", "--help"])
     assert result.exit_code == 0
-    assert "--model" in result.output
+    assert "MODEL_PATH" in result.output
 
 
 def test_report_command_help():
-    """Test report command help."""
+    """Test leaderboard command help (replaces deprecated 'report' command)."""
     runner = CliRunner()
-    result = runner.invoke(cli, ["report", "--help"])
+    result = runner.invoke(cli, ["leaderboard", "--help"])
     assert result.exit_code == 0
-    assert "--latest" in result.output
+    assert "--limit" in result.output

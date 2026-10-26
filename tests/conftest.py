@@ -1,10 +1,10 @@
 """Shared fixtures for FairBench tests."""
 
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
+
+from fairbench.config import BenchmarkConfig
 
 
 @pytest.fixture
@@ -17,28 +17,17 @@ def tmp_results_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def mock_config(tmp_results_dir: Path):
-    """Mock FairBench Config to use temp directories."""
-    config_data = {
-        "api_url": "http://localhost:3000/api",
-        "default_quant": "q4_k_m",
-        "default_n_ctx": 4096,
-        "default_n_gpu_layers": -1,
-        "default_threads": 0,
-        "publish": True,
-        "results_dir": str(tmp_results_dir),
-    }
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        import yaml
-        yaml.dump(config_data, f)
-        config_path = Path(f.name)
-
-    with patch("fairbench.config.Config._ensure_config"):
-        from fairbench.config import Config
-        config = Config.__new__(Config)
-        config.config_path = config_path
-        config._config = config_data
-        yield config
+    """Mock FairBench config to use temp directories."""
+    config = BenchmarkConfig(
+        api_url="http://localhost:3000/api",
+        default_n_ctx=4096,
+        default_n_gpu_layers=-1,
+        default_quant="q4_k_m",
+        default_threads=0,
+        publish=True,
+        results_dir=str(tmp_results_dir),
+    )
+    yield config
 
 
 @pytest.fixture
@@ -70,4 +59,5 @@ def mock_model_file(tmp_path: Path) -> Path:
 def mock_reporter(tmp_results_dir: Path):
     """Create a Reporter with temp directory."""
     from fairbench.reporter import Reporter
+
     return Reporter(results_dir=tmp_results_dir)

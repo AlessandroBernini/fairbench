@@ -1,3 +1,4 @@
-"""FairBench - Fair benchmarking for local LLMs under 70B on consumer hardware."""
+"""FairBench - AI model benchmarking suite with SWE-bench integration."""
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
+__all__ = ["backend", "cli", "config", "data", "engine", "quality", "reporter"]

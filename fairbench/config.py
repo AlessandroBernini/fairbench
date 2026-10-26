@@ -1,71 +1,106 @@
-"""Configuration for FairBench."""
+"""Configuration management for FairBench."""
+
+from __future__ import annotations
 
 from pathlib import Path
 
 import yaml
 
+from fairbench.types import BenchmarkConfig, LiteMode
 
-class Config:
-    """FairBench configuration."""
+DEFAULT_CONFIG: dict[str, str | int | float | bool] = {
+    "api_url": "https://fairbench.vercel.app/api",
+    "default_n_ctx": 4096,
+    "default_n_gpu_layers": -1,
+    "default_quant": "q4_k_m",
+    "default_threads": 0,
+    "publish": True,
+    "results_dir": "/home/jarvispi/.fairbench/results",
+}  # type: ignore[dict-item]
 
-    def __init__(self, config_path: Path | None = None) -> None:
-        self.config_path = config_path or Path.home() / ".fairbench" / "config.yaml"
-        self._ensure_config()
+CONFIG_PATH = Path.home() / ".fairbench" / "config.yaml"
 
-    def _ensure_config(self) -> None:
-        """Create default config if it doesn't exist."""
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.config_path.exists():
-            default = {
-                "api_url": "https://fairbench.vercel.app/api",
-                "default_quant": "q4_k_m",
-                "default_n_ctx": 4096,
-                "default_n_gpu_layers": -1,
-                "default_threads": 0,  # 0 = auto
-                "publish": True,
-                "results_dir": str(Path.home() / ".fairbench" / "results"),
-            }
-            self.config_path.write_text(yaml.dump(default, default_flow_style=False))
 
-    @property
-    def api_url(self) -> str:
-        val = self._get("api_url")
-        return str(val)
+def load_config(path: str | None = None) -> BenchmarkConfig:
+    """Load benchmark configuration from YAML file."""
+    config_path = Path(path) if path else CONFIG_PATH
+    if not config_path.exists():
+        return _default_config()
 
-    @property
-    def default_quant(self) -> str:
-        val = self._get("default_quant")
-        return str(val)
+    with open(config_path, "r") as f:
+        data = yaml.safe_load(f) or {}
 
-    @property
-    def default_n_ctx(self) -> int:
-        val = self._get("default_n_ctx")
-        return int(val)
+    return BenchmarkConfig(
+        api_url=data.get("api_url", DEFAULT_CONFIG["api_url"]),
+        default_n_ctx=data.get("default_n_ctx", DEFAULT_CONFIG["default_n_ctx"]),
+        default_n_gpu_layers=data.get(
+            "default_n_gpu_layers", DEFAULT_CONFIG["default_n_gpu_layers"]
+        ),
+        default_quant=data.get("default_quant", DEFAULT_CONFIG["default_quant"]),
+        default_threads=data.get("default_threads", DEFAULT_CONFIG["default_threads"]),
+        publish=data.get("publish", DEFAULT_CONFIG["publish"]),
+        results_dir=data.get("results_dir", DEFAULT_CONFIG["results_dir"]),
+        lite_mode=_parse_lite_mode(data.get("lite_mode")),
+        swebench_instances=data.get("swebench_instances", 0),
+        swebench_split=data.get("swebench_split", "full"),
+    )
 
-    @property
-    def default_n_gpu_layers(self) -> int:
-        val = self._get("default_n_gpu_layers")
-        return int(val)
 
-    @property
-    def default_threads(self) -> int:
-        val = self._get("default_threads")
-        return int(val)
+def save_config(config: BenchmarkConfig, path: str | None = None) -> None:
+    """Save benchmark configuration to YAML file."""
+    config_path = Path(path) if path else CONFIG_PATH
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    @property
-    def publish_default(self) -> bool:
-        val = self._get("publish")
-        return bool(val)
+    data = {
+        "api_url": config.api_url,
+        "default_n_ctx": config.default_n_ctx,
+        "default_n_gpu_layers": config.default_n_gpu_layers,
+        "default_quant": config.default_quant,
+        "default_threads": config.default_threads,
+        "publish": config.publish,
+        "results_dir": config.results_dir,
+    }
 
-    @property
-    def results_dir(self) -> Path:
-        path = Path(str(self._get("results_dir")))
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+    if config.lite_mode != LiteMode.AUTO:
+        data["lite_mode"] = config.lite_mode.value
 
-    def _get(self, key: str) -> str | int | bool:
-        """Get a config value."""
-        config = yaml.safe_load(self.config_path.read_text())
-        value = config.get(key)
-        assert value is not None
-        return value  # type: ignore[no-any-return]
+    if config.swebench_instances > 0:
+        data["swebench_instances"] = config.swebench_instances
+
+    if config.swebench_split != "full":
+        data["swebench_split"] = config.swebench_split
+
+    with open(config_path, "w") as f:
+        yaml.dump(data, f, default_flow_style=False)
+
+
+def _default_config() -> BenchmarkConfig:
+    """Return default configuration."""
+    return BenchmarkConfig(
+        api_url=str(DEFAULT_CONFIG["api_url"]),
+        default_n_ctx=int(DEFAULT_CONFIG["default_n_ctx"]),
+        default_n_gpu_layers=int(DEFAULT_CONFIG["default_n_gpu_layers"]),
+        default_quant=str(DEFAULT_CONFIG["default_quant"]),
+        default_threads=int(DEFAULT_CONFIG["default_threads"]),
+        publish=bool(DEFAULT_CONFIG["publish"]),
+        results_dir=str(DEFAULT_CONFIG["results_dir"]),
+    )
+
+
+def _parse_lite_mode(value: str | None) -> LiteMode:
+    """Parse lite mode from string value."""
+    if value is None:
+        return LiteMode.AUTO
+    mapping = {
+        "disabled": LiteMode.DISABLED,
+        "enabled": LiteMode.ENABLED,
+        "auto": LiteMode.AUTO,
+    }
+    return mapping.get(value.lower(), LiteMode.AUTO)
+
+
+def ensure_results_dir(results_dir: str | None = None) -> Path:
+    """Ensure results directory exists and return it."""
+    dir_path = Path(results_dir) if results_dir else CONFIG_PATH.parent / "results"
+    dir_path.mkdir(parents=True, exist_ok=True)
+    return dir_path
