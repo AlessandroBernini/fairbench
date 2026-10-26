@@ -7,7 +7,7 @@ name = "fair-bench"
 version = "0.3.0"
 description = "FairBench - AI model benchmarking suite with SWE-bench integration"
 readme = "README.md"
-license-files = ["LICENSE"]
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.1",
@@ -37,6 +37,9 @@ fairbench = "fairbench.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["fairbench*"]
+
+[tool.setuptools]
+license-files = []
 
 [tool.ruff]
 target-version = "py310"
