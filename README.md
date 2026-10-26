@@ -7,9 +7,11 @@ Evaluate AI models across multiple dimensions: quality, speed, memory usage, and
 ## Quick Start
 
 ```bash
-pip install fairbench-ai
+pip install fairbench-ai[ml]
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
+
+> **Prerequisito:** `fairbench-ai[ml]` include `llama-cpp-python` (necessario per speed/memory benchmarks). Su Apple Silicon serve Xcode command-line tools (`xcode-select --install`).
 
 ## Benchmarks
 
@@ -42,7 +44,7 @@ FairBench evaluates models on **8 quality benchmarks** (7 lite, 1 full):
 ### SWE-bench
 
 - Evaluate models on **GitHub issue resolution** tasks
-- Splits: **full**, **lite**, **verified**
+- Splits: **full** (all issues), **lite** (10% stratified sample), **verified** (human-verified only)
 - Fetches real issues from the SWE-bench dataset
 
 ## Usage
