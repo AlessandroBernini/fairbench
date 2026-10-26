@@ -7,7 +7,7 @@ name = "fair-bench"
 version = "0.2.0"
 description = "Fair benchmarking for local LLMs under 70B on consumer hardware"
 readme = "README.md"
-license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     {name = "Alessandro Bernini", email = "alessandro@mair.it"}
