@@ -1,135 +1,152 @@
-"""Reporter for FairBench benchmarks."""
+"""Reporting and publishing for FairBench."""
+
+from __future__ import annotations
 
 import json
-import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import requests
 
-from fairbench.config import Config
+from fairbench.config import load_config
 
 
 class Reporter:
-    """Generate and manage benchmark reports."""
+    """Handles result reporting and leaderboard publishing."""
 
-    def __init__(self, results_dir: Path | None = None):
-        config = Config()
-        self.results_dir = results_dir or config.results_dir
-        self.results_dir.mkdir(parents=True, exist_ok=True)
-        self.api_url = config.api_url.rstrip('/')
-        self.publish_default = config.publish_default
+    def __init__(self, config=None):
+        self.config = config or load_config()
 
-    def generate_report(
+    def format_console_output(
         self,
+        run_id: str,
         model_name: str,
-        quantization: str,
-        hardware: dict[str, Any],
-        quality: dict[str, Any],
-        speed: dict[str, Any],
-        memory: dict[str, Any],
-        publish: bool = True,
-    ) -> Path:
-        """Generate a benchmark report and optionally publish it."""
-        report_id = str(uuid.uuid4())[:8]
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        category: str,
+        results: dict[str, Any],
+    ) -> str:
+        """Format benchmark results for console display."""
+        lines = [
+            f"\n{'=' * 60}",
+            f"FairBench Result: {run_id}",
+            f"Model: {model_name}",
+            f"Category: {category}",
+            f"Timestamp: {datetime.now(timezone.utc).isoformat()}",
+            f"{'=' * 60}",
+        ]
 
-        report = {
-            "id": report_id,
-            "timestamp": timestamp,
-            "published": publish,
-            "model": {
-                "name": model_name,
-                "quantization": quantization,
+        if results.get("quality_results"):
+            lines.append("\nQuality Results:")
+            lines.append("-" * 40)
+            for qr in results["quality_results"]:
+                score = qr["score"]
+                total = qr["items_total"]
+                correct = qr["items_correct"]
+                lines.append(f"  {qr['benchmark_name']}: {score:.4f} ({correct}/{total})")
+
+        if results.get("speed_result"):
+            sr = results["speed_result"]
+            lines.append("\nSpeed Results:")
+            lines.append("-" * 40)
+            lines.append(f"  TTFT: {sr['ttft_avg']:.2f} ms")
+            lines.append(f"  TPOT: {sr['tpot_avg']:.4f} tokens/s")
+            lines.append(f"  Throughput: {sr['throughput_avg']:.2f} tokens/s")
+
+        if results.get("memory_result"):
+            mr = results["memory_result"]
+            lines.append("\nMemory Results:")
+            lines.append("-" * 40)
+            lines.append(f"  VRAM Peak: {mr['vram_peak_mb']:.0f} MB")
+            lines.append(f"  RAM Peak: {mr['ram_peak_mb']:.0f} MB")
+
+        if results.get("swebench_results"):
+            lines.append("\nSWE-bench Results:")
+            lines.append("-" * 40)
+            resolved = sum(1 for r in results["swebench_results"] if r.get("resolved"))
+            total = len(results["swebench_results"])
+            lines.append(
+                f"  Resolved: {resolved}/{total} ({resolved / total * 100:.1f}%)"
+                if total > 0
+                else "  No results"
+            )
+
+        lines.append(f"\n{'=' * 60}")
+        return "\n".join(lines)
+
+    def publish_result(self, run_id: str, result: dict[str, Any]) -> dict[str, Any] | None:
+        """Publish result to the FairBench leaderboard API."""
+        if not self.config.publish:
+            return None
+
+        payload = {
+            "run_id": run_id,
+            "model_name": result["model_name"],
+            "model_path": result["model_path"],
+            "quantization": result["quantization"],
+            "n_ctx": result["n_ctx"],
+            "n_gpu_layers": result["n_gpu_layers"],
+            "n_threads": result["n_threads"],
+            "timestamp": result["timestamp"],
+            "category": result["category"],
+            "quality_scores": {
+                qr["benchmark_name"]: qr["score"] for qr in result.get("quality_results", [])
             },
-            "hardware": hardware,
-            "quality": quality,
-            "speed": speed,
-            "memory": memory,
+            "speed": {
+                "ttft_ms": result.get("speed_result", {}).get("ttft_avg", 0),
+                "tpot_tokens_per_sec": result.get("speed_result", {}).get("tpot_avg", 0),
+                "throughput_tokens_per_sec": result.get("speed_result", {}).get(
+                    "throughput_avg", 0
+                ),
+            },
+            "memory": {
+                "vram_peak_mb": result.get("memory_result", {}).get("vram_peak_mb", 0),
+                "ram_peak_mb": result.get("memory_result", {}).get("ram_peak_mb", 0),
+            },
+            "swebench": {
+                "resolved": sum(
+                    1 for r in result.get("swebench_results", []) if r.get("resolved")
+                ),
+                "total": len(result.get("swebench_results", [])),
+            },
         }
 
-        # Save locally
-        filename = f"{timestamp}_{model_name}_{quantization}_{report_id}.json"
-        filepath = self.results_dir / filename
-        filepath.write_text(json.dumps(report, indent=2))
+        try:
+            response = requests.post(
+                f"{self.config.api_url}/results",
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            resp_data = response.json()
+            assert isinstance(resp_data, dict)
+            return resp_data
+        except requests.RequestException as e:
+            print(f"Publish failed: {e}")
+            return None
 
-        # Publish if requested
-        if publish:
-            self._publish(report)
+    def get_leaderboard(self, limit: int = 50) -> list[dict]:
+        """Fetch latest results from the leaderboard."""
+        try:
+            response = requests.get(
+                f"{self.config.api_url}/results",
+                params={"limit": limit},
+                timeout=30,
+            )
+            response.raise_for_status()
+            resp_data = response.json()
+            assert isinstance(resp_data, list)
+            return resp_data  # type: ignore[return-value]
+        except requests.RequestException as e:
+            print(f"Leaderboard fetch failed: {e}")
+            return []
+
+    def save_local_report(self, run_id: str, result: dict[str, Any]) -> Path:
+        """Save a local JSON report."""
+        results_dir = Path(self.config.results_dir)
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        filepath = results_dir / f"{run_id}_report.json"
+        with open(filepath, "w") as f:
+            json.dump(result, f, indent=2, default=str)
 
         return filepath
-
-    def _publish(self, report: dict[str, Any]) -> bool:
-        """Send report to the Vercel API."""
-        try:
-            resp = requests.post(
-                f"{self.api_url}/report",
-                json=report,
-                timeout=30,
-            )
-            if resp.status_code == 201:
-                return True
-            else:
-                print(f"Warning: publish failed ({resp.status_code}): {resp.text}")
-                return False
-        except requests.RequestException as e:
-            print(f"Warning: publish failed ({e})")
-            return False
-
-    def get_latest(self) -> dict[str, Any] | None:
-        """Get the latest report."""
-        files = sorted(self.results_dir.glob("*.json"))
-        if not files:
-            return None
-        return json.loads(files[-1].read_text())  # type: ignore[no-any-return]
-
-    def list_reports(self, limit: int = 10) -> list[dict[str, Any]]:
-        """List recent reports."""
-        files = sorted(self.results_dir.glob("*.json"), reverse=True)[:limit]
-        reports = []
-        for f in files:
-            report = json.loads(f.read_text())
-            reports.append({
-                "id": report["id"],
-                "timestamp": report["timestamp"],
-                "model": report["model"]["name"],
-                "published": report.get("published", True),
-            })
-        return reports
-
-    def get_leaderboard(
-        self,
-        model: str | None = None,
-        gpu: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Fetch leaderboard data from the API."""
-        try:
-            params = {}
-            if model:
-                params["model"] = model
-            if gpu:
-                params["gpu"] = gpu
-            resp = requests.get(
-                f"{self.api_url}/leaderboard",
-                params=params,
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                return resp.json().get("reports", [])  # type: ignore[no-any-return]
-            return []
-        except requests.RequestException:
-            return []
-
-    def get_model_stats(self) -> list[dict[str, Any]]:
-        """Fetch model statistics from the API."""
-        try:
-            resp = requests.get(
-                f"{self.api_url}/models",
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                return resp.json().get("models", [])  # type: ignore[no-any-return]
-            return []
-        except requests.RequestException:
-            return []

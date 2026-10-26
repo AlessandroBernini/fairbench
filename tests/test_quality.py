@@ -1,109 +1,86 @@
 """Tests for fairbench.quality module."""
 
-from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from fairbench.quality import (
-    ALL_TASKS,
-    BENCHMARK_INFO,
-    DEFAULT_TASKS,
-    get_available_tasks,
-    get_task_info,
+    AVAILABLE_BENCHMARKS,
+    get_lite_benchmarks,
+    list_benchmarks,
     run_quality_benchmark,
 )
 
 
-class TestGetAvailableTasks:
-    def test_returns_all_tasks(self):
-        """get_available_tasks returns all 8 benchmark categories."""
-        tasks = get_available_tasks()
-        assert len(tasks) == 8
-        for task in ALL_TASKS:
-            assert task in tasks
+class TestListBenchmarks:
+    def test_returns_all_benchmarks(self):
+        """list_benchmarks returns all 8 benchmark categories."""
+        benchmarks = list_benchmarks()
+        assert len(benchmarks) == len(AVAILABLE_BENCHMARKS)
+        for name in AVAILABLE_BENCHMARKS:
+            assert name in benchmarks
 
+    def test_returns_dict(self):
+        """list_benchmarks returns a dict."""
+        benchmarks = list_benchmarks()
+        assert isinstance(benchmarks, dict)
+
+    def test_all_benchmarks_have_required_keys(self):
+        """Every benchmark has name, description, and lite keys."""
+        benchmarks = list_benchmarks()
+        for name, info in benchmarks.items():
+            assert "name" in info, f"Missing 'name' for {name}"
+            assert "description" in info, f"Missing 'description' for {name}"
+            assert "lite" in info, f"Missing 'lite' for {name}"
+
+
+class TestGetLiteBenchmarks:
     def test_returns_list(self):
-        """get_available_tasks returns a list."""
-        tasks = get_available_tasks()
-        assert isinstance(tasks, list)
+        """get_lite_benchmarks returns a list."""
+        lite = get_lite_benchmarks()
+        assert isinstance(lite, list)
 
-    def test_all_tasks_have_info(self):
-        """Every task in ALL_TASKS has corresponding BENCHMARK_INFO."""
-        for task in ALL_TASKS:
-            assert task in BENCHMARK_INFO, f"Missing BENCHMARK_INFO for {task}"
-
-
-class TestGetTaskInfo:
-    def test_returns_metadata(self):
-        """get_task_info returns metadata dict for a known task."""
-        info = get_task_info("mmlu")
-        assert info["name"] == "MMLU"
-        assert info["description"] == "Knowledge (57 academic subjects)"
-        assert info["type"] == "multiple_choice"
-
-    def test_returns_default_for_unknown(self):
-        """get_task_info returns default metadata for unknown task."""
-        info = get_task_info("nonexistent")
-        assert info["name"] == "nonexistent"
-        assert info["description"] == "Unknown task"
-
-    def test_humaneval_info(self):
-        """get_task_info returns correct info for HumanEval."""
-        info = get_task_info("humaneval")
-        assert info["name"] == "HumanEval"
-        assert info["type"] == "pass_at_1"
-        assert info["lite"] == "16 samples"
+    def test_all_lite_benchmarks_are_valid(self):
+        """All returned lite benchmarks exist in AVAILABLE_BENCHMARKS."""
+        lite = get_lite_benchmarks()
+        for name in lite:
+            assert name in AVAILABLE_BENCHMARKS
+            assert AVAILABLE_BENCHMARKS[name]["lite"] is True
 
 
 class TestRunQualityBenchmark:
-    def test_default_tasks(self):
-        """run_quality_benchmark with no tasks uses DEFAULT_TASKS."""
-        result = run_quality_benchmark(
-            model_path=Path("/nonexistent/model.gguf"),
-            lite=True,
-        )
-        # Should return zeros since model doesn't exist
-        assert isinstance(result, dict)
-        for key in DEFAULT_TASKS:
-            assert key in result
-            assert result[key] == 0.0
+    def test_returns_list_of_results(self):
+        """run_quality_benchmark returns a list of QualityResult."""
+        # Mock simple_evaluate to return a valid result
+        fake_result = {
+            "results": {"mmlu": {"acc": 0.75, "items": 100, "correct": 75}},
+        }
+        fake_lm_eval = MagicMock()
+        fake_lm_eval.simple_evaluate.return_value = fake_result
+        with patch.dict("sys.modules", {"lm_eval": fake_lm_eval}):
+            result = run_quality_benchmark(
+                model_path="/nonexistent/model.gguf",
+                benchmark_name="mmlu",
+            )
+            assert isinstance(result, list)
+            assert len(result) > 0
+            # Verify the score was parsed correctly
+            assert result[0].score == 0.75
 
-    def test_invalid_tasks_warning(self, capsys):
-        """run_quality_benchmark warns about invalid tasks."""
-        result = run_quality_benchmark(
-            model_path=Path("/nonexistent/model.gguf"),
-            task_names_in=["mmlu", "nonexistent_task"],
-            lite=True,
-        )
-        assert isinstance(result, dict)
-        # Should have filtered out the invalid task
-        assert "nonexistent_task" not in result
+    def test_graceful_degradation_without_lm_eval(self):
+        """run_quality_benchmark returns zero scores when lm_eval is unavailable."""
+        # Mock the import inside the quality module
+        with patch.dict("sys.modules", {"lm_eval": None}):
+            result = run_quality_benchmark(
+                model_path="/nonexistent/model.gguf",
+                benchmark_name="mmlu",
+            )
+            for r in result:
+                assert r.score == 0.0
+                assert "fallback" in r.metadata
 
-    def test_all_zero_on_missing_model(self):
-        """run_quality_benchmark returns zeros for nonexistent model."""
-        result = run_quality_benchmark(
-            model_path=Path("/nonexistent/path/model.gguf"),
-            task_names_in=["mmlu", "gsm8k"],
-            lite=True,
-        )
-        assert result["mmlu"] == 0.0
-        assert result["gsm8k"] == 0.0
-
-    def test_no_tasks_returns_defaults(self):
-        """None task list returns DEFAULT_TASKS as fallback."""
-        result = run_quality_benchmark(
-            model_path=Path("/nonexistent/model.gguf"),
-            task_names_in=None,
-            lite=True,
-        )
-        for key in DEFAULT_TASKS:
-            assert key in result
-
-    def test_missing_lm_eval_returns_zeros(self):
-        """run_quality_benchmark returns zeros when lm_eval import fails."""
-        # Simply verify the graceful degradation path works
-        # by using a nonexistent model (triggers early return before lm_eval)
-        result = run_quality_benchmark(
-            model_path=Path("/nonexistent/path/model.gguf"),
-            task_names_in=["mmlu"],
-            lite=True,
-        )
-        assert result["mmlu"] == 0.0
+    def test_all_benchmarks_when_no_benchmark_specified(self):
+        """run_quality_benchmark runs all benchmarks when no benchmark_name given."""
+        with patch.dict("sys.modules", {"lm_eval": None}):
+            result = run_quality_benchmark(
+                model_path="/nonexistent/model.gguf",
+            )
+            assert len(result) == len(AVAILABLE_BENCHMARKS)

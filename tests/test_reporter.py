@@ -4,139 +4,155 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from fairbench.config import BenchmarkConfig
 from fairbench.reporter import Reporter
 
 
+@pytest.fixture
+def mock_config(tmp_results_dir: Path):
+    """Create a mock config for Reporter tests."""
+    return BenchmarkConfig(
+        api_url="http://localhost:3000/api",
+        default_n_ctx=4096,
+        default_n_gpu_layers=-1,
+        default_quant="q4_k_m",
+        default_threads=0,
+        publish=False,
+        results_dir=str(tmp_results_dir),
+    )
+
+
 class TestReporter:
-    def test_generate_report(self, tmp_results_dir: Path):
-        """test_generate_report: generate_report creates a JSON file with correct structure."""
-        reporter = Reporter(results_dir=tmp_results_dir)
-        hardware = {
-            "cpu": {"model": "Test", "cores": 4, "threads": 8},
-            "ram_gb": 16.0,
-            "gpu": {"type": "none"},
-            "os": "Linux",
+    def test_save_local_report(self, tmp_results_dir: Path, mock_config: BenchmarkConfig):
+        """test_save_local_report: save_local_report creates a JSON file with correct structure."""
+        reporter = Reporter(config=mock_config)
+        result = {
+            "model_name": "test-model",
+            "model_path": "/path/to/model.gguf",
+            "quantization": "q4_k_m",
+            "n_ctx": 4096,
+            "n_gpu_layers": -1,
+            "n_threads": 0,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "category": "quality",
+            "quality_results": [
+                {
+                    "benchmark_name": "mmlu",
+                    "score": 0.75,
+                    "items_total": 100,
+                    "items_correct": 75,
+                    "metadata": {},
+                }
+            ],
+            "speed_result": {
+                "ttft_avg": 100.0,
+                "tpot_avg": 5.0,
+                "throughput_avg": 50.0,
+                "runs": 3,
+                "metadata": {},
+            },
+            "memory_result": {"vram_peak_mb": 4000.0, "ram_peak_mb": 8000.0, "metadata": {}},
+            "swebench_results": [],
         }
-        report_path = reporter.generate_report(
-            model_name="test-model",
-            quantization="q4_k_m",
-            hardware=hardware,
-            quality={"mmlu": 0.75},
-            speed={"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True},
-            memory={"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5},
-            publish=False,
-        )
+        report_path = reporter.save_local_report("test-run", result)
 
         assert report_path.exists()
         assert report_path.suffix == ".json"
 
         # Read and verify content
         content = json.loads(report_path.read_text())
-        assert content["model"]["name"] == "test-model"
-        assert content["model"]["quantization"] == "q4_k_m"
-        assert content["quality"]["mmlu"] == 0.75
-        assert content["published"] is False
-        assert "hardware" in content
-        assert "speed" in content
-        assert "memory" in content
+        assert content["model_name"] == "test-model"
+        assert content["quantization"] == "q4_k_m"
 
-    def test_list_reports(self, tmp_results_dir: Path):
-        """test_list_reports: list_reports returns list of report summaries."""
-        reporter = Reporter(results_dir=tmp_results_dir)
-
-        # Generate a report first
-        hardware = {
-            "cpu": {"model": "Test", "cores": 4, "threads": 8},
-            "ram_gb": 16.0,
-            "gpu": {"type": "none"},
-            "os": "Linux",
+    def test_format_console_output(self, mock_config: BenchmarkConfig):
+        """format_console_output returns a formatted string."""
+        reporter = Reporter(config=mock_config)
+        result = {
+            "model_name": "test-model",
+            "model_path": "/path/to/model.gguf",
+            "quantization": "q4_k_m",
+            "n_ctx": 4096,
+            "n_gpu_layers": -1,
+            "n_threads": 0,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "category": "quality",
+            "quality_results": [
+                {
+                    "benchmark_name": "mmlu",
+                    "score": 0.75,
+                    "items_total": 100,
+                    "items_correct": 75,
+                    "metadata": {},
+                }
+            ],
+            "speed_result": {
+                "ttft_avg": 100.0,
+                "tpot_avg": 5.0,
+                "throughput_avg": 50.0,
+                "runs": 3,
+                "metadata": {},
+            },
+            "memory_result": {"vram_peak_mb": 4000.0, "ram_peak_mb": 8000.0, "metadata": {}},
+            "swebench_results": [],
         }
-        reporter.generate_report(
-            model_name="test-model",
-            quantization="q4_k_m",
-            hardware=hardware,
-            quality={"mmlu": 0.75},
-            speed={"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True},
-            memory={"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5},
-            publish=False,
-        )
+        output = reporter.format_console_output("test-run", "test-model", "quality", result)
+        assert "FairBench Result" in output
+        assert "test-model" in output
+        assert "mmlu" in output
 
-        reports = reporter.list_reports()
-        assert len(reports) >= 1
-        assert "id" in reports[0]
-        assert "timestamp" in reports[0]
-        assert "model" in reports[0]
-        assert "published" in reports[0]
-
-    def test_get_latest(self, tmp_results_dir: Path):
-        """test_get_latest: get_latest returns the most recent report."""
-        reporter = Reporter(results_dir=tmp_results_dir)
-
-        # Generate two reports
-        hardware = {
-            "cpu": {"model": "Test", "cores": 4, "threads": 8},
-            "ram_gb": 16.0,
-            "gpu": {"type": "none"},
-            "os": "Linux",
-        }
-
-        reporter.generate_report(
-            model_name="model-a",
-            quantization="q4_k_m",
-            hardware=hardware,
-            quality={"mmlu": 0.7},
-            speed={"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True},
-            memory={"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5},
-            publish=False,
-        )
-
-        import time
-        time.sleep(0.1)  # Ensure different timestamp
-
-        reporter.generate_report(
-            model_name="model-b",
-            quantization="q4_k_m",
-            hardware=hardware,
-            quality={"mmlu": 0.8},
-            speed={"ttft_ms": 80.0, "tpot_ms": 4.0, "throughput": 60.0, "measured": True},
-            memory={"vram_peak_gb": 3.5, "cpu_ram_peak_gb": 7.5, "model_file_size_gb": 3.0},
-            publish=False,
-        )
-
-        latest = reporter.get_latest()
-        assert latest is not None
-        assert latest["model"]["name"] == "model-b"
-
-    def test_get_latest_no_reports(self, tmp_results_dir: Path):
-        """test_get_latest_no_reports: get_latest returns None when no reports exist."""
-        reporter = Reporter(results_dir=tmp_results_dir)
-        latest = reporter.get_latest()
-        assert latest is None
+    def test_publish_false_returns_none(self, mock_config: BenchmarkConfig):
+        """publish_result returns None when publish is False."""
+        reporter = Reporter(config=mock_config)
+        result = {"model_name": "test-model"}
+        assert reporter.publish_result("test-run", result) is None
 
     @patch("fairbench.reporter.requests.post")
-    def test_publish_calls_api(self, mock_post, tmp_results_dir: Path):
-        """test_publish_calls_api: publish sends POST to API."""
+    def test_publish_calls_api(self, mock_post, mock_config: BenchmarkConfig):
+        """publish_result sends POST to API when publish is True."""
+        mock_config.publish = True
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.json.return_value = {"status": "ok"}
         mock_post.return_value = mock_response
 
-        reporter = Reporter(results_dir=tmp_results_dir)
-        hardware = {
-            "cpu": {"model": "Test", "cores": 4, "threads": 8},
-            "ram_gb": 16.0,
-            "gpu": {"type": "none"},
-            "os": "Linux",
+        reporter = Reporter(config=mock_config)
+        result = {
+            "model_name": "test-model",
+            "model_path": "/path/to/model.gguf",
+            "quantization": "q4_k_m",
+            "n_ctx": 4096,
+            "n_gpu_layers": -1,
+            "n_threads": 0,
+            "timestamp": "2024-01-01T00:00:00Z",
+            "category": "quality",
+            "quality_scores": {"mmlu": 0.75},
+            "speed": {
+                "ttft_ms": 100.0,
+                "tpot_tokens_per_sec": 5.0,
+                "throughput_tokens_per_sec": 50.0,
+            },
+            "memory": {"vram_peak_mb": 4000.0, "ram_peak_mb": 8000.0},
+            "swebench": {"resolved": 0, "total": 0},
         }
-        reporter.generate_report(
-            model_name="test-model",
-            quantization="q4_k_m",
-            hardware=hardware,
-            quality={"mmlu": 0.75},
-            speed={"ttft_ms": 100.0, "tpot_ms": 5.0, "throughput": 50.0, "measured": True},
-            memory={"vram_peak_gb": 4.0, "cpu_ram_peak_gb": 8.0, "model_file_size_gb": 3.5},
-            publish=True,
-        )
+        response = reporter.publish_result("test-run", result)
 
         mock_post.assert_called_once()
-        call_args = mock_post.call_args
-        assert "/report" in call_args.args[0]
+        assert response == {"status": "ok"}
+
+    def test_get_leaderboard(self, mock_config: BenchmarkConfig):
+        """get_leaderboard returns results from API."""
+        reporter = Reporter(config=mock_config)
+        with patch("fairbench.reporter.requests.get") as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = [
+                {"model_name": "model-1", "quality_scores": {"mmlu": 0.7}},
+                {"model_name": "model-2", "quality_scores": {"mmlu": 0.8}},
+            ]
+            mock_get.return_value = mock_response
+
+            results = reporter.get_leaderboard(limit=10)
+            assert len(results) == 2
+            assert results[0]["model_name"] == "model-1"
