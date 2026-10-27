@@ -81,12 +81,16 @@ def run_quality_benchmark(
         has_lm_eval = False
 
     if not has_lm_eval:
-        # Graceful degradation
+        # Graceful degradation with clear warning
         benchmarks_to_run = (
             [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
         )
         if tasks:
             benchmarks_to_run = tasks
+
+        print("\n⚠ Warning: lm_eval not installed. Quality benchmarks will return score=0.")
+        print("   Install with: pip install lm-eval")
+        print("   Or run: pip install fairbench-ai[ml]\n")
 
         results = []
         for name in benchmarks_to_run:

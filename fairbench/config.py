@@ -15,7 +15,7 @@ DEFAULT_CONFIG: dict[str, str | int | float | bool] = {
     "default_quant": "q4_k_m",
     "default_threads": 0,
     "publish": True,
-    "results_dir": "/home/jarvispi/.fairbench/results",
+    "results_dir": str(Path.home() / ".fairbench" / "results"),
 }  # type: ignore[dict-item]
 
 CONFIG_PATH = Path.home() / ".fairbench" / "config.yaml"
