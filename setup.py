@@ -1,46 +1,66 @@
 #!/usr/bin/env python3
-"""Setup script for FairBench (pip install compatibility)."""
+"""Custom installation for FairBench - handles llama-cpp-python C compilation."""
 
+import os
+import subprocess
+import sys
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+
+
+class CustomInstall(install):
+    """Install core deps, then llama-cpp-python with wheel preference."""
+
+    def run(self):
+        install.run(self)
+
+        # Attempt to install llama-cpp-python with wheel preference
+        print("\nInstalling llama-cpp-python (LLM inference backend)...")
+        env = os.environ.copy()
+        env["LLAMA_CPP_FORCE_BUILD"] = "0"  # Prefer precompiled wheels
+
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "llama-cpp-python"],
+                env=env,
+                check=True,
+            )
+            print("✓ llama-cpp-python installed successfully.")
+        except subprocess.CalledProcessError:
+            print("\n⚠ Warning: Failed to install llama-cpp-python automatically.")
+            print("This requires C build tools (cmake, build-essential).")
+            print("\nTry running manually:")
+            print("  pip install llama-cpp-python")
+            print("\nIf that fails, install build dependencies first:")
+            print("  sudo apt-get install cmake build-essential  # Debian/Ubuntu")
+            print("  brew install cmake llvm                     # macOS")
+            print("  sudo dnf install cmake gcc-c++              # Fedora/RHEL")
+            sys.exit(1)
+
 
 setup(
-    name="fair-bench",
-    version="0.2.0",
-    description="Fair benchmarking for local LLMs under 70B on consumer hardware",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
+    name="fairbench-ai",
+    version="0.3.0",
+    description="FairBench - AI model benchmarking suite with SWE-bench integration",
     author="Alessandro Bernini",
-    author_email="alessandro@mair.it",
     url="https://github.com/AlessandroBernini/fairbench",
     license="Apache-2.0",
-    packages=find_packages(exclude=["tests*", "scripts*"]),
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: Apache Software License",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    ],
-    python_requires=">=3.10",
+    packages=find_packages(),
     install_requires=[
-        "click>=8.1.7",
-        "requests>=2.31.0",
-        "psutil>=5.9.0",
-        "llama-cpp-python>=0.3.0",
-        "lm-eval>=0.4.0",
-        "pydantic>=2.0.0",
-        "rich>=13.0.0",
+        "click>=8.1",
         "pyyaml>=6.0",
+        "requests>=2.31",
+        "psutil>=5.9",
+        "lm-eval>=0.4",
+        "swebench>=2.0",
+        "datasets>=2.14",
+        "rich>=13.0",
     ],
     extras_require={
-        "dev": ["pytest>=7.0", "ruff>=0.1.0", "mypy>=1.0"],
+        "ml": ["llama-cpp-python>=0.3.0"],
+        "dev": ["pytest>=7.0", "ruff>=0.1", "mypy>=1.0", "huggingface-hub>=0.20"],
     },
-    entry_points={
-        "console_scripts": [
-            "fairbench=fairbench.cli:cli",
-        ],
+    cmdclass={
+        "install": CustomInstall,
     },
 )
