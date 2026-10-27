@@ -99,7 +99,7 @@ def run_quality_benchmark(
                 import sys
                 result = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "lm-eval"],
-                    capture_output=True,
+                    check=False, capture_output=True,
                     text=True,
                 )
                 if result.returncode == 0:
