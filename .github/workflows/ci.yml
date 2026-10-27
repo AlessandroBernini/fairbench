@@ -20,9 +20,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
+      - name: Install system build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
 
       - name: Run tests with pytest
         run: pytest tests/ -v --tb=short
