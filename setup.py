@@ -14,6 +14,11 @@ class CustomInstall(install):
     def run(self):
         install.run(self)
 
+        # Skip llama-cpp-python in CI
+        if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+            print("\n⚠ Skipping llama-cpp-python installation in CI environment.")
+            return
+
         # Attempt to install llama-cpp-python with wheel preference
         print("\nInstalling llama-cpp-python (LLM inference backend)...")
         env = os.environ.copy()
