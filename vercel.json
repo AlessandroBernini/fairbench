@@ -22,5 +22,8 @@
       "src": "/",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "NEON_DATABASE_URL": "@NEON_DATABASE_URL"
+  }
 }
