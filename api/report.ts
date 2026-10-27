@@ -1,10 +1,12 @@
 // POST /api/report - Submit a benchmark report
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { randomUUID } from 'crypto';
 
 export const config = {
   api: {
     bodyParser: true,
   },
+  cache: 'no-store',
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -12,14 +14,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const neonUrl = process.env.NEON_DATABASE_URL;
-  if (!neonUrl) {
-    return res.status(500).json({ error: 'Database not configured' });
+  const dbError = getDbError();
+  if (dbError) {
+    return res.status(500).json({ error: dbError });
   }
 
   try {
-    const { neon } = await import('@neondatabase/serverless');
-    const sql = neon(neonUrl);
+    const sql = await getDb();
     const report = req.body;
 
     if (!report || typeof report !== 'object') {
@@ -30,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const modelName = report.model_name || report.model?.name;
     const quantization = report.quantization || report.model?.quantization;
     const timestamp = report.timestamp || new Date().toISOString();
-    const id = report.run_id || report.id || crypto.randomUUID();
+    const id = report.run_id || report.id || randomUUID();
     const published = report.published ?? true;
 
     if (!modelName || !quantization) {
