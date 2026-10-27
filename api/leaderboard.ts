@@ -48,9 +48,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idx++;
     }
     if (min_score) {
-      const avgScore = `(quality_mmlu + quality_hellaswag + quality_gsm8k) / 3`;
-      query += ` AND ${avgScore} >= $${idx}`;
-      params.push(parseFloat(min_score as string));
+      const minScore = parseFloat(min_score as string);
+      query += ` AND (quality_mmlu + quality_hellaswag + quality_gsm8k) / 3 >= $${idx}`;
+      params.push(minScore);
       idx++;
     }
 
