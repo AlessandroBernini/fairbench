@@ -1,6 +1,5 @@
 """Post-installation utilities for FairBench."""
 
-import sys
 from pathlib import Path
 
 
@@ -66,7 +65,7 @@ def print_init_guide():
     if config_file.exists():
         print(f"     ✓ Config file exists: {config_file}")
     else:
-        print(f"     ✗ Config file NOT found")
+        print("     ✗ Config file NOT found")
         print("     → FairBench will create it automatically on first run")
     
     print()
