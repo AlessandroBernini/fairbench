@@ -1,39 +1,17 @@
 #!/usr/bin/env python3
 """Automatically determine version bump based on PR title and update pyproject.toml."""
 
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 
-def get_last_merged_pr_title():
-    """Fetch the title of the last merged PR targeting main."""
-    try:
-        result = subprocess.run(
-            [
-                "gh", "pr", "list",
-                "--repo", "AlessandroBernini/fairbench",
-                "--base", "main",
-                "--state", "merged",
-                "--limit", "1",
-                "--json", "title"
-            ],
-            capture_output=True, text=True, check=True
-        )
-        import json
-        data = json.loads(result.stdout)
-        if data:
-            return data[0].get("title", "")
-    except Exception:
-        pass
-    return ""
-
-
-def determine_bump(pr_title):
+def determine_bump(commit_msg):
     """Return 'minor' for features, 'patch' otherwise."""
     # Normalize title to lowercase
-    t = pr_title.lower()
+    t = commit_msg.lower()
     
     # Check for major features (e.g., "feat:", "feature", "breaking")
     if any(kw in t for kw in ["feat:", "feature:", "feature ", "breaking", "major"]):
@@ -68,6 +46,15 @@ def commit_and_push(version):
     subprocess.run(["git", "push"], check=True)
 
 
+def get_commit_message(sha, repo="AlessandroBernini/fairbench"):
+    """Get commit message from the current SHA."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{repo}/commits/{sha}", "--jq", ".commit.message"],
+        capture_output=True, text=True, check=True
+    )
+    return result.stdout.strip()
+
+
 def main():
     # 1. Check if we already bumped (look for [skip ci] in latest commit)
     result = subprocess.run(
@@ -77,18 +64,23 @@ def main():
         print("Version already bumped in this run. Skipping.")
         return
 
-    # 2. Get PR title and determine bump
-    pr_title = get_last_merged_pr_title()
-    print(f"Last merged PR title: '{pr_title}'")
-    
-    if not pr_title:
-        print("No merged PR found. Aborting version bump.")
-        sys.exit(0)
+    # 2. Get commit message from GITHUB_SHA (the commit that triggered this workflow)
+    github_sha = os.environ.get("GITHUB_SHA", "")
+    if not github_sha:
+        # Fallback: use HEAD
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        github_sha = result.stdout.strip()
 
-    bump_type = determine_bump(pr_title)
+    commit_msg = get_commit_message(github_sha)
+    print(f"Triggering commit message: '{commit_msg}'")
+
+    # 3. Determine bump type from commit message
+    bump_type = determine_bump(commit_msg)
     print(f"Determined bump type: {bump_type}")
 
-    # 3. Calculate new version
+    # 4. Calculate new version
     pyproject = Path("pyproject.toml")
     content = pyproject.read_text()
     match = re.search(r'version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', content)
@@ -106,7 +98,7 @@ def main():
 
     print(f"Bumping version: {match.group(1)}.{match.group(2)}.{match.group(3)} -> {new_version}")
 
-    # 4. Update file and commit
+    # 5. Update file and commit
     update_version_file(new_version)
     
     # Use GITHUB_TOKEN for push (standard in CI)
