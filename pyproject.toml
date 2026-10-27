@@ -18,6 +18,7 @@ dependencies = [
     "swebench>=2.0",
     "datasets>=2.14",
     "rich>=13.0",
+    "llama-cpp-python>=0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -26,9 +27,6 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "huggingface-hub>=0.20",
-]
-ml = [
-    "llama-cpp-python>=0.3.0",
 ]
 
 [project.scripts]
