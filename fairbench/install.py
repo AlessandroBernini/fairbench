@@ -110,7 +110,7 @@ def cmd_init():
     config_dir = Path.home() / ".fairbench"
     
     # Create directory structure
-    print(f"📁 Creating FairBench directories...")
+    print("📁 Creating FairBench directories...")
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "results").mkdir(parents=True, exist_ok=True)
     print(f"   ✓ {config_dir}")
