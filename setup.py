@@ -42,6 +42,10 @@ class CustomInstall(install):
             print("  sudo dnf install cmake gcc-c++              # Fedora/RHEL")
             sys.exit(1)
 
+        # Print friendly post-install message
+        from fairbench.install import print_post_install_message
+        print_post_install_message()
+
 
 setup(
     name="fairbench-ai",

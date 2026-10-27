@@ -15,16 +15,38 @@ from fairbench.types import BenchmarkCategory
 @click.option("--config", "-c", "config_path", help="Path to config file", default=None)
 @click.pass_context
 def cli(ctx, config_path):
-    """FairBench - AI model benchmarking suite with SWE-bench integration.
+    """FairBench — AI model benchmarking suite with SWE-bench integration.
 
-    FairBench evaluates AI models across multiple dimensions:
-    - Quality: MMLU, HellaSwag, GSM8K, HumanEval, IFEval, TruthfulQA, ARC-Challenge, LiveBench
-    - Speed: TTFT, TPOT, throughput
-    - Memory: VRAM and RAM peak usage
-    - SWE-bench: GitHub issue resolution capability
+    Evaluate your GGUF models across quality, speed, memory, and coding benchmarks.
+
+    Quick Start:
+      fairbench init          Set up FairBench interactively
+      fairbench run MODEL     Benchmark a GGUF model
+      fairbench show-paths    Show config & results locations
+      fairbench list-benchmarks  List available quality benchmarks
+
+    Examples:
+      fairbench run ~/models/qwen2.5-7b.gguf
+      fairbench run model.gguf --category quality --tasks mmlu hellaswag
+      fairbench run model.gguf --category speed
+      fairbench config --show
     """
     ctx.ensure_object(dict)
     ctx.obj["config"] = load_config(config_path)
+
+
+@cli.command()
+def init():
+    """Interactive setup wizard — creates config, checks dependencies, shows paths."""
+    from fairbench.install import cmd_init
+    cmd_init()
+
+
+@cli.command("show-paths")
+def show_paths():
+    """Show all FairBench directories and file locations."""
+    from fairbench.install import cmd_show_paths
+    cmd_show_paths()
 
 
 @cli.command()
