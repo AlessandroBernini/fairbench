@@ -144,12 +144,10 @@ class BenchmarkEngine:
         print(f"\nResult saved to: {saved_path}")
 
         # Publish if configured
-        published_successfully = False
         if self.config.publish:
             result = self.reporter.publish_result(run_id, result_dict)
             if result:
                 print("Result published to leaderboard")
-                published_successfully = True
             else:
                 print("⚠ Warning: Failed to publish result (API unavailable)")
         else:
