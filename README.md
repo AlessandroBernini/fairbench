@@ -7,11 +7,17 @@ Evaluate AI models across multiple dimensions: quality, speed, memory usage, and
 ## Quick Start
 
 ```bash
-pip install fairbench-ai[ml]
+# Install everything (core + LM evaluation + SWE-bench)
+pip install fairbench-ai[all]
+
+# Interactive setup wizard (creates config, checks dependencies)
+fairbench init
+
+# Run benchmarks on a GGUF model
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
 
-> **Prerequisito:** `fairbench-ai[ml]` include `llama-cpp-python` (necessario per speed/memory benchmarks). Su Apple Silicon serve Xcode command-line tools (`xcode-select --install`).
+> **Nota:** `fairbench-ai[all]` installa automaticamente anche `llama-cpp-python`. Se fallisce, il comando ti guiderà nell'installazione manuale. Su Apple Silicon serve Xcode command-line tools (`xcode-select --install`).
 
 ## Benchmarks
 
@@ -97,6 +103,17 @@ fairbench config --show       # Show current config
 fairbench config --set key=value  # Set a config value
 ```
 
+### Setup e paths
+
+```bash
+fairbench init                # Interactive setup wizard
+fairbench show-paths          # Show config & results locations
+```
+
+`fairbench init` crea la directory `~/.fairbench/`, genera un config di default se non esiste, verifica le dipendenze disponibili (lm-eval, llama-cpp-python, swebench) e mostra una quick start guide.
+
+`fairbench show-paths` elenca tutti i percorsi usati da FairBench (config, results, package location) senza hardcoded strings.
+
 ## Configuration
 
 Edit `~/.fairbench/config.yaml`:
@@ -127,16 +144,23 @@ By default, every benchmark run is **automatically published** to the public lea
 
 ## Optional Dependencies
 
+FairBench installs core dependencies automatically with `pip install fairbench-ai`.
+
 ```bash
-# ML benchmarks (lm-eval, llama-cpp-python)
+# All components (lm-eval + llama-cpp-python + swebench)
+pip install fairbench-ai[all]
+
+# ML benchmarks only (lm-eval, llama-cpp-python)
 pip install fairbench-ai[ml]
 
 # SWE-bench evaluation
 pip install fairbench-ai[swebench]
 
-# Development
+# Development (pytest, ruff, mypy, huggingface-hub)
 pip install fairbench-ai[dev]
 ```
+
+> **Nota:** Se `lm-eval` non è installato quando esegui un benchmark, FairBench ti chiederà interattivamente se vuoi installarlo automaticamente. In ambienti non-interactive (CI/cron) salta il benchmark qualità e stampa un warning.
 
 ## Requirements
 
