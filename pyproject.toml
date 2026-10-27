@@ -15,7 +15,6 @@ dependencies = [
     "requests>=2.31",
     "psutil>=5.9",
     "lm-eval>=0.4",
-    "llama-cpp-python>=0.3.0",
     "swebench>=2.0",
     "datasets>=2.14",
     "rich>=13.0",
@@ -46,3 +45,6 @@ line-length = 99
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
+ml = [
+    "llama-cpp-python>=0.3.0",
+]
