@@ -92,7 +92,7 @@ def print_init_guide():
             print(f"     - {name}")
         
         install_cmd = f"pip install fairbench-ai[{','.join(missing)}]"
-        print(f"\n  💡 Install with:")
+        print("\n  💡 Install with:")
         print(f"     {install_cmd}")
     
     # Show quick start
@@ -106,7 +106,6 @@ def print_init_guide():
 
 def cmd_init():
     """Interactive init command."""
-    import click
     
     config_dir = Path.home() / ".fairbench"
     
