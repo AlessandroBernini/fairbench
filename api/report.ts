@@ -1,6 +1,12 @@
 // POST /api/report - Submit a benchmark report
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -16,12 +22,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = neon(neonUrl);
     const report = req.body;
 
-    // Validate required fields
-    if (!report?.model || !report?.hardware) {
-      return res.status(400).json({ error: 'Missing required fields: model, hardware' });
+    if (!report || typeof report !== 'object') {
+      return res.status(400).json({ error: 'Invalid request body' });
     }
 
-    // Insert report
+    // Accept both the new format (from reporter.py) and legacy format
+    const modelName = report.model_name || report.model?.name;
+    const quantization = report.quantization || report.model?.quantization;
+    const timestamp = report.timestamp || new Date().toISOString();
+    const id = report.run_id || report.id || crypto.randomUUID();
+    const published = report.published ?? true;
+
+    if (!modelName || !quantization) {
+      return res.status(400).json({ error: 'Missing required fields: model_name, quantization' });
+    }
+
+    const hardware = report.hardware || {};
+    const quality = report.quality_scores || {};
+    const speed = report.speed || {};
+    const memory = report.memory || {};
+
     const result = await sql`
       INSERT INTO reports (
         id, timestamp, published, model_name, quantization,
@@ -31,17 +51,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         speed_ttft_ms, speed_tpot_ms, speed_throughput,
         memory_vram_peak_gb, memory_cpu_ram_peak_gb, memory_model_file_gb
       ) VALUES (
-        ${report.id}, ${report.timestamp}, ${report.published ?? true},
-        ${report.model.name}, ${report.model.quantization},
-        ${report.hardware.cpu?.model || ''}, ${report.hardware.cpu?.cores || 0},
-        ${report.hardware.cpu?.threads || 0}, ${report.hardware.ram_gb || 0},
-        ${report.hardware.gpu?.type || 'none'}, ${report.hardware.gpu?.model || ''},
-        ${report.hardware.gpu?.vram_gb || 0}, ${report.hardware.os || ''},
-        ${report.quality?.mmlu ?? 0}, ${report.quality?.hellaswag ?? 0},
-        ${report.quality?.gsm8k ?? 0}, ${report.speed?.ttft_ms ?? 0},
-        ${report.speed?.tpot_ms ?? 0}, ${report.speed?.throughput ?? 0},
-        ${report.memory?.vram_peak_gb ?? 0}, ${report.memory?.cpu_ram_peak_gb ?? 0},
-        ${report.memory?.model_file_size_gb ?? 0}
+        ${id}, ${timestamp}, ${published},
+        ${modelName}, ${quantization},
+        ${hardware.cpu_model || ''}, ${hardware.cpu_cores || 0},
+        ${hardware.cpu_threads || 0}, ${hardware.ram_gb || 0},
+        ${hardware.gpu_type || 'none'}, ${hardware.gpu_model || ''},
+        ${hardware.gpu_vram_gb || 0}, ${hardware.os || ''},
+        ${quality.mmlu ?? 0}, ${quality.hellaswag ?? 0}, ${quality.gsm8k ?? 0},
+        ${speed.ttft_ms ?? 0}, ${speed.tpot_ms ?? 0}, ${speed.throughput ?? 0},
+        ${memory.vram_peak_gb ?? 0}, ${memory.cpu_ram_peak_gb ?? 0},
+        ${report.memory_model_file_gb ?? 0}
       )
       RETURNING id, timestamp, published
     `;

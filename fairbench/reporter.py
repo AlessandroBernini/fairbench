@@ -78,29 +78,40 @@ class Reporter:
         if not self.config.publish:
             return None
 
+        # Map MB values to GB for the API schema
+        vram_peak_gb = result.get("memory_result", {}).get("vram_peak_mb", 0) / 1024
+        ram_peak_gb = result.get("memory_result", {}).get("ram_peak_mb", 0) / 1024
+
         payload = {
             "run_id": run_id,
             "model_name": result["model_name"],
-            "model_path": result["model_path"],
             "quantization": result["quantization"],
             "n_ctx": result["n_ctx"],
             "n_gpu_layers": result["n_gpu_layers"],
             "n_threads": result["n_threads"],
             "timestamp": result["timestamp"],
             "category": result["category"],
+            "hardware": {
+                "cpu_model": result.get("cpu_model", ""),
+                "cpu_cores": result.get("cpu_cores", 0),
+                "cpu_threads": result.get("cpu_threads", 0),
+                "ram_gb": result.get("ram_gb", 0),
+                "gpu_type": result.get("gpu_type", "none"),
+                "gpu_model": result.get("gpu_model", ""),
+                "gpu_vram_gb": result.get("gpu_vram_gb", 0),
+                "os": result.get("os", ""),
+            },
             "quality_scores": {
                 qr["benchmark_name"]: qr["score"] for qr in result.get("quality_results", [])
             },
             "speed": {
                 "ttft_ms": result.get("speed_result", {}).get("ttft_avg", 0),
-                "tpot_tokens_per_sec": result.get("speed_result", {}).get("tpot_avg", 0),
-                "throughput_tokens_per_sec": result.get("speed_result", {}).get(
-                    "throughput_avg", 0
-                ),
+                "tpot_ms": result.get("speed_result", {}).get("tpot_avg", 0),
+                "throughput": result.get("speed_result", {}).get("throughput_avg", 0),
             },
             "memory": {
-                "vram_peak_mb": result.get("memory_result", {}).get("vram_peak_mb", 0),
-                "ram_peak_mb": result.get("memory_result", {}).get("ram_peak_mb", 0),
+                "vram_peak_gb": vram_peak_gb,
+                "cpu_ram_peak_gb": ram_peak_gb,
             },
             "swebench": {
                 "resolved": sum(
@@ -112,7 +123,7 @@ class Reporter:
 
         try:
             response = requests.post(
-                f"{self.config.api_url}/results",
+                f"{self.config.api_url}/report",
                 json=payload,
                 timeout=30,
             )

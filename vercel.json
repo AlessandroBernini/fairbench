@@ -7,5 +7,8 @@
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/leaderboard", "dest": "/leaderboard.html" },
     { "src": "/", "dest": "/index.html" }
-  ]
+  ],
+  "env": {
+    "NEON_DATABASE_URL": "@neon_database_url"
+  }
 }
