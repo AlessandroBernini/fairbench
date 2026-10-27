@@ -3,43 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>FairBench - Leaderboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0a0a0a; color: #e5e5e5; }
-    .header { border-bottom: 1px solid #222; }
-    .card { background: #111; border: 1px solid #222; }
-    .card:hover { border-color: #333; }
+    :root {
+      --bg: #0a0a0a; --card-bg: #111; --border: #222; --border-hover: #333;
+      --text: #e5e5e5; --muted: #888; --light: #ccc; --accent: #4ade80;
+      --accent-cpu: #fbbf24; --accent-quant: #818cf8; --danger: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
+    .container { max-width: 7xl; margin: 0 auto; padding: 0 1rem; }
+    .header { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; }
+    .title { font-size: 1.875rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--muted); font-size: 0.875rem; }
+    .github-link { color: var(--muted); transition: color 0.2s; }
+    .github-link:hover { color: var(--text); }
+    .filters { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filter-btn { background: #1a1a1a; border: 1px solid #333; color: var(--muted); padding: 0.375rem 0.75rem; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s; font-size: 0.875rem; }
+    .filter-btn:hover, .filter-btn.active { background: #222; color: var(--text); border-color: #555; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); padding: 1rem; border-radius: 0.5rem; }
+    .stat-label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+    .card:hover { border-color: var(--border-hover); }
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+    td { color: var(--light); padding: 0.75rem 1rem; }
+    tr { border-bottom: 1px solid var(--border); }
+    tr:last-child { border-bottom: none; }
+    tr:hover { background: rgba(255,255,255,0.02); }
+    .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+    .stat-num { font-variant-numeric: tabular-nums; }
     .badge { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; }
-    .badge-gpu { background: #1a3a2a; color: #4ade80; }
-    .badge-cpu { background: #3a2a1a; color: #fbbf24; }
-    .badge-quant { background: #1a1a3a; color: #818cf8; }
-    table th { color: #888; font-weight: 500; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
-    table td { color: #ccc; }
-    .stat { font-variant-numeric: tabular-nums; }
-    .filter-btn { background: #1a1a1a; border: 1px solid #333; color: #888; padding: 0.375rem 0.75rem; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s; }
-    .filter-btn:hover, .filter-btn.active { background: #222; color: #fff; border-color: #555; }
+    .badge-gpu { background: #1a3a2a; color: var(--accent); }
+    .badge-cpu { background: #3a2a1a; color: var(--accent-cpu); }
+    .badge-quant { background: #1a1a3a; color: var(--accent-quant); }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .text-muted { color: var(--muted); }
+    .text-danger { color: var(--danger); }
+    .text-accent { color: var(--accent); font-weight: 600; }
     .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .footer { margin-top: 2rem; text-align: center; color: var(--muted); font-size: 0.75rem; }
+    .footer code { background: #1a1a1a; padding: 0.125rem 0.375rem; border-radius: 0.25rem; }
+    @media (min-width: 768px) {
+      .container { padding: 0 2rem; }
+      .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    }
   </style>
 </head>
-<body class="min-h-screen">
-  <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Header -->
-    <div class="header pb-6 mb-8">
-      <div class="flex items-center justify-between">
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-inner">
         <div>
-          <h1 class="text-3xl font-bold mb-1">FairBench</h1>
-          <p class="text-gray-500">Fair benchmarking for local LLMs on consumer hardware</p>
+          <h1 class="title">FairBench</h1>
+          <p class="subtitle">Fair benchmarking for local LLMs on consumer hardware</p>
         </div>
-        <a href="https://github.com/AlessandroBernini/fairbench" target="_blank" class="text-gray-400 hover:text-white transition">
-          <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        <a href="https://github.com/AlessandroBernini/fairbench" target="_blank" class="github-link">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
         </a>
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="flex gap-2 mb-6 flex-wrap">
+    <div class="filters">
       <button class="filter-btn active" onclick="filterBy('all')">All</button>
       <button class="filter-btn" onclick="filterBy('nvidia')">NVIDIA</button>
       <button class="filter-btn" onclick="filterBy('cpu')">CPU Only</button>
@@ -48,57 +80,54 @@
       <button class="filter-btn" onclick="filterBy('mistral')">Mistral</button>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="card p-4 rounded-lg">
-        <div class="text-gray-500 text-sm">Total Reports</div>
-        <div class="text-2xl font-bold stat" id="total-reports">—</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Reports</div>
+        <div class="stat-value" id="total-reports">—</div>
       </div>
-      <div class="card p-4 rounded-lg">
-        <div class="text-gray-500 text-sm">Models Benchmarked</div>
-        <div class="text-2xl font-bold stat" id="total-models">—</div>
+      <div class="stat-card">
+        <div class="stat-label">Models Benchmarked</div>
+        <div class="stat-value" id="total-models">—</div>
       </div>
-      <div class="card p-4 rounded-lg">
-        <div class="text-gray-500 text-sm">Unique GPUs</div>
-        <div class="text-2xl font-bold stat" id="total-gpus">—</div>
+      <div class="stat-card">
+        <div class="stat-label">Unique GPUs</div>
+        <div class="stat-value" id="total-gpus">—</div>
       </div>
-      <div class="card p-4 rounded-lg">
-        <div class="text-gray-500 text-sm">Avg Throughput</div>
-        <div class="text-2xl font-bold stat" id="avg-throughput">—</div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Throughput</div>
+        <div class="stat-value" id="avg-throughput">—</div>
       </div>
     </div>
 
-    <!-- Leaderboard Table -->
-    <div class="card rounded-lg overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="border-b border-gray-800">
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
             <tr>
-              <th class="px-4 py-3 text-left">#</th>
-              <th class="px-4 py-3 text-left">Model</th>
-              <th class="px-4 py-3 text-left">Hardware</th>
-              <th class="px-4 py-3 text-center">MMLU</th>
-              <th class="px-4 py-3 text-center">HellaSwag</th>
-              <th class="px-4 py-3 text-center">GSM8K</th>
-              <th class="px-4 py-3 text-right">TTFT (ms)</th>
-              <th class="px-4 py-3 text-right">TPOT (ms)</th>
-              <th class="px-4 py-3 text-right">TPS</th>
-              <th class="px-4 py-3 text-right">VRAM (GB)</th>
+              <th>#</th>
+              <th>Model</th>
+              <th>Hardware</th>
+              <th class="text-center">MMLU</th>
+              <th class="text-center">HellaSwag</th>
+              <th class="text-center">GSM8K</th>
+              <th class="text-right">TTFT (ms)</th>
+              <th class="text-right">TPOT (ms)</th>
+              <th class="text-right">TPS</th>
+              <th class="text-right">VRAM (GB)</th>
             </tr>
           </thead>
           <tbody id="leaderboard-body">
             <tr>
-              <td colspan="10" class="text-center py-8 text-gray-500 loading">Loading leaderboard...</td>
+              <td colspan="10" class="text-center py-8 text-muted loading">Loading leaderboard...</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Footer -->
-    <div class="mt-8 text-center text-gray-600 text-sm">
+    <div class="footer">
       <p>FairBench — Democratizing local LLM benchmarking</p>
-      <p class="mt-1">Run your own benchmark with <code class="bg-gray-900 px-1 rounded">pip install fairbench-ai</code></p>
+      <p style="margin-top: 0.25rem;">Run your own benchmark with <code>pip install fairbench-ai</code></p>
     </div>
   </div>
 
@@ -114,14 +143,14 @@
         updateStats(allReports);
       } catch (e) {
         document.getElementById('leaderboard-body').innerHTML = 
-          '<tr><td colspan="10" class="text-center py-8 text-red-400">Failed to load leaderboard</td></tr>';
+          '<tr><td colspan="10" class="text-center py-8 text-danger">Failed to load leaderboard</td></tr>';
       }
     }
 
     function renderLeaderboard(reports) {
       const tbody = document.getElementById('leaderboard-body');
       if (reports.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">No reports yet. Be the first!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-muted">No reports yet. Be the first!</td></tr>';
         return;
       }
 
@@ -132,20 +161,20 @@
         const quantBadge = `<span class="badge badge-quant">${r.quantization}</span>`;
         
         return `
-          <tr class="border-b border-gray-800 hover:bg-gray-900/50 transition">
-            <td class="px-4 py-3 font-mono text-gray-400">${i + 1}</td>
-            <td class="px-4 py-3">
+          <tr>
+            <td class="mono text-muted">${i + 1}</td>
+            <td>
               <div class="font-medium">${r.model_name}</div>
-              <div class="text-xs text-gray-500">${r.timestamp}</div>
+              <div class="text-xs text-muted">${r.timestamp}</div>
             </td>
-            <td class="px-4 py-3">${gpuBadge} ${quantBadge}</td>
-            <td class="px-4 py-3 text-center font-mono stat">${(r.quality_mmlu * 100).toFixed(1)}%</td>
-            <td class="px-4 py-3 text-center font-mono stat">${(r.quality_hellaswag * 100).toFixed(1)}%</td>
-            <td class="px-4 py-3 text-center font-mono stat">${(r.quality_gsm8k * 100).toFixed(1)}%</td>
-            <td class="px-4 py-3 text-right font-mono stat">${r.speed_ttft_ms.toFixed(1)}</td>
-            <td class="px-4 py-3 text-right font-mono stat">${r.speed_tpot_ms.toFixed(1)}</td>
-            <td class="px-4 py-3 text-right font-mono stat font-bold text-green-400">${r.speed_throughput.toFixed(1)}</td>
-            <td class="px-4 py-3 text-right font-mono stat">${r.memory_vram_peak_gb.toFixed(1)}</td>
+            <td>${gpuBadge} ${quantBadge}</td>
+            <td class="text-center mono stat-num">${(r.quality_mmlu * 100).toFixed(1)}%</td>
+            <td class="text-center mono stat-num">${(r.quality_hellaswag * 100).toFixed(1)}%</td>
+            <td class="text-center mono stat-num">${(r.quality_gsm8k * 100).toFixed(1)}%</td>
+            <td class="text-right mono stat-num">${r.speed_ttft_ms.toFixed(1)}</td>
+            <td class="text-right mono stat-num">${r.speed_tpot_ms.toFixed(1)}</td>
+            <td class="text-right mono stat-num text-accent">${r.speed_throughput.toFixed(1)}</td>
+            <td class="text-right mono stat-num">${r.memory_vram_peak_gb.toFixed(1)}</td>
           </tr>
         `;
       }).join('');

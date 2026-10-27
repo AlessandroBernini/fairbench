@@ -1,19 +1,25 @@
 // GET /api/leaderboard - Get leaderboard with optional filters
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+  cache: 'no-store',
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const neonUrl = process.env.NEON_DATABASE_URL;
-  if (!neonUrl) {
-    return res.status(500).json({ error: 'Database not configured' });
+  const dbError = getDbError();
+  if (dbError) {
+    return res.status(500).json({ error: dbError });
   }
 
   try {
-    const { neon } = await import('@neondatabase/serverless');
-    const sql = neon(neonUrl);
+    const sql = await getDb();
 
     const { model, gpu, min_score } = req.query;
     let query = `
@@ -42,9 +48,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idx++;
     }
     if (min_score) {
-      const avgScore = `(quality_mmlu + quality_hellaswag + quality_gsm8k) / 3`;
-      query += ` AND ${avgScore} >= $${idx}`;
-      params.push(parseFloat(min_score as string));
+      const minScore = parseFloat(min_score as string);
+      query += ` AND (quality_mmlu + quality_hellaswag + quality_gsm8k) / 3 >= $${idx}`;
+      params.push(minScore);
       idx++;
     }
 
