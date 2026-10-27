@@ -22,7 +22,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
+          pip install -e ".[dev,ml]"
+          pip install -e ".[swebench]"
 
       - name: Run tests with pytest
         run: pytest tests/ -v --tb=short
