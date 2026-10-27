@@ -81,30 +81,54 @@ def run_quality_benchmark(
         has_lm_eval = False
 
     if not has_lm_eval:
-        # Graceful degradation with clear warning
+        # Check if we're in a non-interactive environment (CI, cron, etc.)
+        is_interactive = hasattr(__import__('sys').stdin, 'isatty') and __import__('sys').stdin.isatty()
+
         benchmarks_to_run = (
             [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
         )
         if tasks:
             benchmarks_to_run = tasks
 
-        print("\n⚠ Warning: lm_eval not installed. Quality benchmarks will return score=0.")
-        print("   Install with: pip install lm-eval")
-        print("   Or run: pip install fairbench-ai[ml]\n")
-
-        results = []
-        for name in benchmarks_to_run:
-            info = AVAILABLE_BENCHMARKS.get(name, {})
-            results.append(
-                QualityResult(
-                    benchmark_name=name,
-                    score=0.0,
-                    items_total=0,
-                    items_correct=0,
-                    metadata={"reason": "lm_eval not installed", "fallback": True},
+        if is_interactive:
+            print("\n⚠ lm_eval not found — quality benchmarks require it.")
+            response = input("   Install lm-eval now? [y/N]: ").strip().lower()
+            if response in ('y', 'yes'):
+                print("\n   Installing lm-eval...")
+                import subprocess
+                import sys
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "lm-eval"],
+                    capture_output=True,
+                    text=True,
                 )
-            )
-        return results
+                if result.returncode == 0:
+                    print("   ✓ lm-eval installed successfully.")
+                    # Retry import
+                    try:
+                        from lm_eval import simple_evaluate  # type: ignore
+                        has_lm_eval = True
+                    except ImportError:
+                        print("   ✗ Still can't import lm-eval after install. Skipping benchmarks.\n")
+            else:
+                print("   Skipping quality benchmarks (lm_eval not installed).\n")
+
+        if not has_lm_eval:
+            # Fallback to zero scores
+            results = []
+            for name in benchmarks_to_run:
+                info = AVAILABLE_BENCHMARKS.get(name, {})
+                results.append(
+                    QualityResult(
+                        benchmark_name=name,
+                        score=0.0,
+                        items_total=0,
+                        items_correct=0,
+                        metadata={"reason": "lm_eval not installed", "fallback": True},
+                    )
+                )
+            return results
+        # If user said yes and install succeeded, continue to benchmark execution below
 
     # Determine which benchmarks to run
     benchmarks_to_run = [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
