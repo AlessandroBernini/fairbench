@@ -21,11 +21,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install system build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -e ".[dev,ml]"
           pip install -e ".[swebench]"

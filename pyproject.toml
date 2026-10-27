@@ -15,15 +15,13 @@ dependencies = [
     "requests>=2.31",
     "psutil>=5.9",
     "lm-eval>=0.4",
+    "llama-cpp-python>=0.3.0",
     "swebench>=2.0",
     "datasets>=2.14",
     "rich>=13.0",
 ]
 
 [project.optional-dependencies]
-ml = [
-    "llama-cpp-python>=0.3.0",
-]
 dev = [
     "pytest>=7.0",
     "ruff>=0.1",
