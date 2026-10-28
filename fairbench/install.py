@@ -104,14 +104,15 @@ def cmd_verify():
     # Check disk space (rough estimate)
     try:
         import shutil
-        total, used, free = shutil.disk_usage(str(Path.home()))
+        _total, _used, free = shutil.disk_usage(str(Path.home()))
         free_gb = free / (1024**3)
         if free_gb >= 5:
             lines.append(f"  ✅ Disk space available: {free_gb:.1f} GB")
         else:
             lines.append(f"  ⚠️  Low disk space: {free_gb:.1f} GB (recommend at least 5 GB)")
             warnings.append("Free up space if you plan to run benchmarks")
-    except Exception:
+    except OSError:
+        # Could not determine disk usage (shouldn't happen on normal systems)
         pass
 
     # Summary
