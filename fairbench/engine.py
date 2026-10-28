@@ -66,6 +66,16 @@ class BenchmarkEngine:
         print(f"Context: {n_ctx}, GPU Layers: {n_gpu_layers}, Threads: {n_threads}")
         print(f"Quantization: {quantization}")
 
+        # Verify model file exists
+        if not Path(model_path).exists():
+            print(f"\n❌ Error: Model file not found: {model_path}")
+            print("\n  Possible fixes:")
+            print("  • Check the path is correct")
+            print("  • Use an absolute path (e.g., ~/models/model.gguf)")
+            print("  • Download a model first:")
+            print("    huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --include '*.gguf*' --local-dir ~/models/")
+            raise SystemExit(1)
+
         run = BenchmarkRun(
             model_name=Path(model_path).stem,
             model_path=model_path,
@@ -176,43 +186,70 @@ class BenchmarkEngine:
 
         # Quality
         print("\n[Quality Benchmark]")
-        quality_results = run_quality_benchmark(
-            model_path=model_path,
-            tasks=tasks,
-            lite_mode=lite_mode_enum,
-            config=self.config,
-        )
-        run.quality_results = quality_results
-
-        for result in quality_results:
-            print(
-                f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})"
+        try:
+            quality_results = run_quality_benchmark(
+                model_path=model_path,
+                tasks=tasks,
+                lite_mode=lite_mode_enum,
+                config=self.config,
             )
+            run.quality_results = quality_results
+
+            for result in quality_results:
+                print(
+                    f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})"
+                )
+        except ImportError as e:
+            if "lm_eval" in str(e).lower():
+                print("\n  ❌ lm-eval not installed")
+                print("  ℹ️  Quality benchmarks require lm-eval")
+                print("  💡 Install with:")
+                print("     pip install fairbench-ai[ml]")
+            else:
+                raise
 
         # Speed
         print("\n[Speed Benchmark]")
-        speed_result = benchmark_speed(
-            model_path=model_path,
-            n_ctx=n_ctx,
-            n_gpu_layers=n_gpu_layers,
-            n_threads=n_threads,
-        )
-        run.speed_result = speed_result
-        print(f"  TTFT: {speed_result.ttft_avg:.2f}ms")
-        print(f"  TPOT: {speed_result.tpot_avg:.4f} tokens/s")
-        print(f"  Throughput: {speed_result.throughput_avg:.2f} tokens/s")
+        try:
+            speed_result = benchmark_speed(
+                model_path=model_path,
+                n_ctx=n_ctx,
+                n_gpu_layers=n_gpu_layers,
+                n_threads=n_threads,
+            )
+            run.speed_result = speed_result
+            print(f"  TTFT: {speed_result.ttft_avg:.2f}ms")
+            print(f"  TPOT: {speed_result.tpot_avg:.4f} tokens/s")
+            print(f"  Throughput: {speed_result.throughput_avg:.2f} tokens/s")
+        except ImportError as e:
+            if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
+                print("\n  ❌ llama-cpp-python not installed")
+                print("  ℹ️  Speed/memory benchmarks require llama-cpp-python")
+                print("  💡 Install with:")
+                print("     pip install llama-cpp-python")
+            else:
+                raise
 
         # Memory
         print("\n[Memory Benchmark]")
-        memory_result = benchmark_memory(
-            model_path=model_path,
-            n_ctx=n_ctx,
-            n_gpu_layers=n_gpu_layers,
-            n_threads=n_threads,
-        )
-        run.memory_result = memory_result
-        print(f"  VRAM Peak: {memory_result.vram_peak_mb:.0f} MB")
-        print(f"  RAM Peak: {memory_result.ram_peak_mb:.0f} MB")
+        try:
+            memory_result = benchmark_memory(
+                model_path=model_path,
+                n_ctx=n_ctx,
+                n_gpu_layers=n_gpu_layers,
+                n_threads=n_threads,
+            )
+            run.memory_result = memory_result
+            print(f"  VRAM Peak: {memory_result.vram_peak_mb:.0f} MB")
+            print(f"  RAM Peak: {memory_result.ram_peak_mb:.0f} MB")
+        except ImportError as e:
+            if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
+                print("\n  ❌ llama-cpp-python not installed")
+                print("  ℹ️  Speed/memory benchmarks require llama-cpp-python")
+                print("  💡 Install with:")
+                print("     pip install llama-cpp-python")
+            else:
+                raise
 
         return run
 
