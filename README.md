@@ -17,7 +17,7 @@ fairbench init
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
 
-> **Nota:** `fairbench-ai[all]` installa automaticamente anche `llama-cpp-python`. Se fallisce, il comando ti guiderà nell'installazione manuale. Su Apple Silicon serve Xcode command-line tools (`xcode-select --install`).
+> **Note:** `fairbench-ai[all]` automatically installs `llama-cpp-python` as well. If it fails, the script will guide you through manual installation. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`).
 
 ## Benchmarks
 
@@ -103,16 +103,16 @@ fairbench config --show       # Show current config
 fairbench config --set key=value  # Set a config value
 ```
 
-### Setup e paths
+### Setup and paths
 
 ```bash
 fairbench init                # Interactive setup wizard
 fairbench show-paths          # Show config & results locations
 ```
 
-`fairbench init` crea la directory `~/.fairbench/`, genera un config di default se non esiste, verifica le dipendenze disponibili (lm-eval, llama-cpp-python, swebench) e mostra una quick start guide.
+`fairbench init` creates the `~/.fairbench/` directory, generates a default config if it doesn't exist, checks available dependencies (lm-eval, llama-cpp-python, swebench), and displays a quick start guide.
 
-`fairbench show-paths` elenca tutti i percorsi usati da FairBench (config, results, package location) senza hardcoded strings.
+`fairbench show-paths` lists all paths used by FairBench (config, results, package location) without hardcoded strings.
 
 ## Configuration
 
@@ -160,7 +160,7 @@ pip install fairbench-ai[swebench]
 pip install fairbench-ai[dev]
 ```
 
-> **Nota:** Se `lm-eval` non è installato quando esegui un benchmark, FairBench ti chiederà interattivamente se vuoi installarlo automaticamente. In ambienti non-interactive (CI/cron) salta il benchmark qualità e stampa un warning.
+> **Note:** If `lm-eval` is not installed when running a benchmark, FairBench will interactively ask if you want to install it automatically. In non-interactive environments (CI/cron), it skips the quality benchmark and prints a warning.
 
 ## Requirements
 
