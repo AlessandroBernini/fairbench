@@ -103,6 +103,42 @@ fairbench config --show       # Show current config
 fairbench config --set key=value  # Set a config value
 ```
 
+## Tools
+
+### Download models
+Download GGUF models directly from HuggingFace:
+
+```bash
+# Auto-select first available GGUF file
+fairbench download Qwen/Qwen2.5-1.5B-Instruct
+
+# Download specific variant
+fairbench download Qwen/Qwen2.5-1.5B-Instruct \
+  --filename Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+
+# Custom destination
+fairbench download Qwen/Qwen2.5-1.5B-Instruct \
+  --local-dir ~/my-models/
+```
+
+Models are saved to `~/models/` by default.
+
+### Verify system
+Check FairBench installation and system readiness:
+
+```bash
+fairbench verify
+```
+
+Validates Python version, dependencies (lm-eval, llama-cpp-python), disk space, and config.
+
+### Quick start demo
+Show a demo plan with available benchmarks and models:
+
+```bash
+fairbench quick-start
+```
+
 ### Setup and paths
 
 ```bash
@@ -111,6 +147,8 @@ fairbench show-paths          # Show config & results locations
 ```
 
 `fairbench init` creates the `~/.fairbench/` directory, generates a default config if it doesn't exist, checks available dependencies (lm-eval, llama-cpp-python, swebench), and displays a quick start guide.
+
+> **Note:** The wizard now prompts for leaderboard username, publishing preference (default: enabled), GPU layers, and quantization type.
 
 `fairbench show-paths` lists all paths used by FairBench (config, results, package location) without hardcoded strings.
 
