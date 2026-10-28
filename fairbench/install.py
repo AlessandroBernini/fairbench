@@ -86,7 +86,7 @@ def cmd_verify():
     if config_file.exists():
         lines.append(f"  ✅ Config file found: {config_file}")
     else:
-        lines.append(f"  ⚠️  Config file missing (will be auto-created on first run)")
+        lines.append("  ⚠️  Config file missing (will be auto-created on first run)")
         warnings.append("Run 'fairbench init' to create it manually")
 
     # Check dependencies
