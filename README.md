@@ -121,7 +121,7 @@ fairbench download Qwen/Qwen2.5-1.5B-Instruct \
   --local-dir ~/my-models/
 ```
 
-Models are saved to `~/models/` by default.
+Models are saved to `~/models/` by default. Download progress is shown with a terminal progress bar (percentage, speed, ETA).
 
 ### Verify system
 Check FairBench installation and system readiness:
