@@ -369,7 +369,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
                 repo_id=model_id,
                 filename=filename,
                 local_dir=str(target_dir),
-                resume_download=True,
+                force_download=False,
             )
         else:
             # Download first GGUF file
@@ -379,7 +379,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
                 repo_id=model_id,
                 filename=selected_file,
                 local_dir=str(target_dir),
-                resume_download=True,
+                force_download=False,
             )
         
         print("\n  ✅ Model downloaded successfully!")
