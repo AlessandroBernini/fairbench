@@ -242,7 +242,7 @@ def cmd_init():
     # Ask for publish setting
     publish = click.confirm(
         "📤 Enable leaderboard publishing?",
-        default=False,
+        default=True,
     )
     
     # Ask for GPU layers
