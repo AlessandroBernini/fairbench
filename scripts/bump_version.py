@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Automatically determine version bump based on PR title and update pyproject.toml."""
 
-import os
 import re
 import subprocess
 import sys
@@ -46,15 +45,6 @@ def commit_and_push(version):
     subprocess.run(["git", "push"], check=True)
 
 
-def get_commit_message(sha, repo="AlessandroBernini/fairbench"):
-    """Get commit message from the current SHA."""
-    result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/commits/{sha}", "--jq", ".commit.message"],
-        capture_output=True, text=True, check=True
-    )
-    return result.stdout.strip()
-
-
 def main():
     # 1. Check if we already bumped (look for [skip ci] in latest commit)
     result = subprocess.run(
@@ -64,16 +54,9 @@ def main():
         print("Version already bumped in this run. Skipping.")
         return
 
-    # 2. Get commit message from GITHUB_SHA (the commit that triggered this workflow)
-    github_sha = os.environ.get("GITHUB_SHA", "")
-    if not github_sha:
-        # Fallback: use HEAD
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        )
-        github_sha = result.stdout.strip()
-
-    commit_msg = get_commit_message(github_sha)
+    # 2. Get commit message from HEAD (already set to trigger commit by GitHub Actions)
+    head_msg = result.stdout.strip()
+    commit_msg = head_msg.split('\n')[0]  # First line is the subject
     print(f"Triggering commit message: '{commit_msg}'")
 
     # 3. Determine bump type from commit message
