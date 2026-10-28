@@ -348,6 +348,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
     # Try using huggingface_hub first
     try:
         from huggingface_hub import hf_hub_download, list_repo_files
+        from tqdm import tqdm  # bundled with huggingface_hub
         
         files = list_repo_files(model_id, repo_type="model")
         gguf_files = [f for f in files if f.endswith(".gguf") or "gguf" in f.lower()]
@@ -370,6 +371,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
                 filename=filename,
                 local_dir=str(target_dir),
                 force_download=False,
+                tqdm_class=tqdm,
             )
         else:
             # Download first GGUF file
@@ -380,6 +382,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
                 filename=selected_file,
                 local_dir=str(target_dir),
                 force_download=False,
+                tqdm_class=tqdm,
             )
         
         print("\n  ✅ Model downloaded successfully!")
