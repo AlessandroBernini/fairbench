@@ -21,15 +21,18 @@ def cli(ctx, config_path):
 
     Quick Start:
       fairbench init          Set up FairBench interactively
+      fairbench verify        Check system readiness
       fairbench run MODEL     Benchmark a GGUF model
       fairbench show-paths    Show config & results locations
+      fairbench quick-start   Demo with available benchmarks
       fairbench list-benchmarks  List available quality benchmarks
 
     Examples:
       fairbench run ~/models/qwen2.5-7b.gguf
       fairbench run model.gguf --category quality --tasks mmlu hellaswag
       fairbench run model.gguf --category speed
-      fairbench config --show
+      fairbench verify
+      fairbench quick-start
     """
     ctx.ensure_object(dict)
     ctx.obj["config"] = load_config(config_path)
@@ -47,6 +50,24 @@ def show_paths():
     """Show all FairBench directories and file locations."""
     from fairbench.install import cmd_show_paths
     cmd_show_paths()
+
+
+@cli.command()
+def verify():
+    """Verify FairBench installation and system readiness.
+    
+    Checks Python version, config files, dependencies, and disk space.
+    Shows actionable guidance for any issues found.
+    """
+    from fairbench.install import cmd_verify
+    cmd_verify()
+
+
+@cli.command("quick-start")
+def quick_start():
+    """Show a demo plan with available benchmarks and models."""
+    from fairbench.install import cmd_quick_start
+    cmd_quick_start()
 
 
 @cli.command()
