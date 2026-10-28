@@ -213,6 +213,7 @@ def cmd_quick_start():
 def cmd_init():
     """Interactive setup wizard — creates config, checks dependencies, shows paths."""
     import click
+
     from fairbench.config import load_config, save_config
 
     config_dir = Path.home() / ".fairbench"
@@ -381,7 +382,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
                 resume_download=True,
             )
         
-        print(f"\n  ✅ Model downloaded successfully!")
+        print("\n  ✅ Model downloaded successfully!")
         print(f"   Saved to: {local_file}")
         print()
         print("  🚀 Run benchmark:")
@@ -403,7 +404,7 @@ def cmd_download(model_id: str, filename: str | None = None, local_dir: str | No
             return
         
         try:
-            result = subprocess.run(cmd, capture_output=False)
+            result = subprocess.run(cmd, capture_output=False, check=False)
             if result.returncode == 0:
                 print(f"\n  ✅ Model downloaded successfully to {target_dir}")
             else:
