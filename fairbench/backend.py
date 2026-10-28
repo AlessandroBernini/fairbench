@@ -7,6 +7,7 @@ import subprocess
 import time
 
 import psutil
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from fairbench.types import MemoryResult, SpeedResult
 
@@ -47,44 +48,52 @@ def _benchmark_with_llama_cpp(
     tpots: list[float] = []
     throughputs: list[float] = []
 
-    for i in range(runs):
-        try:
-            llm = Llama(  # type: ignore[no-untyped-call]
-                model_path=model_path,
-                n_ctx=n_ctx,
-                n_gpu_layers=n_gpu_layers,
-                n_threads=n_threads if n_threads > 0 else None,
-                verbose=False,
-            )
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("  [bold blue]Speed[/]  {task.description}", justify="right"),
+        refresh_per_second=1,
+    ) as progress:
+        for i in range(runs):
+            task = progress.add_task(f"Run {i + 1}/{runs}", total=None)
+            try:
+                llm = Llama(  # type: ignore[no-untyped-call]
+                    model_path=model_path,
+                    n_ctx=n_ctx,
+                    n_gpu_layers=n_gpu_layers,
+                    n_threads=n_threads if n_threads > 0 else None,
+                    verbose=False,
+                )
 
-            start = time.time()
-            response = llm.create_completion(
-                prompt=prompt,
-                max_tokens=512,
-                temperature=0.7,
-                stream=True,
-            )
+                start = time.time()
+                response = llm.create_completion(
+                    prompt=prompt,
+                    max_tokens=512,
+                    temperature=0.7,
+                    stream=True,
+                )
 
-            ttft = time.time() - start
-            ttfts.append(ttft * 1000)  # ms
+                ttft = time.time() - start
+                ttfts.append(ttft * 1000)  # ms
 
-            token_count = 0
-            last_time = time.time()
-            for chunk in response:
-                if time.time() - last_time > 0.01:
-                    elapsed = time.time() - last_time
-                    tpots.append((token_count / elapsed) if elapsed > 0 else 0)
-                    token_count = 0
-                    last_time = time.time()
-                token_count += 1
+                token_count = 0
+                last_time = time.time()
+                for chunk in response:
+                    if time.time() - last_time > 0.01:
+                        elapsed = time.time() - last_time
+                        tpots.append((token_count / elapsed) if elapsed > 0 else 0)
+                        token_count = 0
+                        last_time = time.time()
+                    token_count += 1
 
-            total_time = time.time() - start
-            throughput = token_count / total_time if total_time > 0 else 0
-            throughputs.append(throughput)
+                total_time = time.time() - start
+                throughput = token_count / total_time if total_time > 0 else 0
+                throughputs.append(throughput)
 
-            llm.close()
-        except (OSError, RuntimeError) as e:
-            print(f"    Run {i + 1} failed: {e}")
+                llm.close()
+                progress.update(task, completed=1)
+            except (OSError, RuntimeError) as e:
+                progress.update(task, completed=1)
+                print(f"    Run {i + 1} failed: {e}")
 
     return SpeedResult(
         ttft_avg=sum(ttfts) / len(ttfts) if ttfts else 0.0,
