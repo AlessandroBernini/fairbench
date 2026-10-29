@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+
 from fairbench.types import BenchmarkConfig, LiteMode, QualityResult
 
 AVAILABLE_BENCHMARKS = {
@@ -145,49 +147,62 @@ def run_quality_benchmark(
         pass  # No filtering; run all available benchmarks
 
     results = []
-    for benchmark in benchmarks_to_run:
-        info = AVAILABLE_BENCHMARKS.get(benchmark, {})
-        print(f"  Running {info.get('name', benchmark)}...")
+    total = len(benchmarks_to_run)
 
-        start = time.time()
-        try:
-            eval_results = simple_evaluate(
-                model="llama-cpp",
-                model_args=model_path,
-                tasks=[benchmark],
-                batch_size="auto",
-                log_samples=True,
-                verbosity="WARNING",
-            )
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold green]Quality[/]  {task.description}"),
+        BarColumn(),
+        TextColumn("{task.percentage:.0f}%"),
+        refresh_per_second=1,
+    ) as progress:
+        for idx, benchmark in enumerate(benchmarks_to_run, start=1):
+            info = AVAILABLE_BENCHMARKS.get(benchmark, {})
+            task_name = f"Benchmark {idx}/{total}: {info.get('name', benchmark)}"
+            task = progress.add_task(task_name, total=100)
 
-            score = eval_results.get("results", {}).get(benchmark, {}).get("acc", 0.0)
-            items_total = eval_results.get("results", {}).get(benchmark, {}).get("items", 0)
-            items_correct = eval_results.get("results", {}).get(benchmark, {}).get("correct", 0)
+            print(f"\n  ⏳ Running {info.get('name', benchmark)}...")
 
-            elapsed = time.time() - start
-            results.append(
-                QualityResult(
-                    benchmark_name=benchmark,
-                    score=score,
-                    items_total=items_total,
-                    items_correct=items_correct,
-                    metadata={
-                        "elapsed_seconds": elapsed,
-                        "description": info.get("description", ""),
-                    },
+            start = time.time()
+            try:
+                eval_results = simple_evaluate(
+                    model="llama-cpp",
+                    model_args=model_path,
+                    tasks=[benchmark],
+                    batch_size="auto",
+                    log_samples=True,
+                    verbosity="WARNING",
                 )
-            )
-            print(f"    Score: {score:.4f} ({items_correct}/{items_total}) in {elapsed:.1f}s")
-        except (OSError, RuntimeError) as e:
-            print(f"    Error: {e}")
-            results.append(
-                QualityResult(
-                    benchmark_name=benchmark,
-                    score=0.0,
-                    items_total=0,
-                    items_correct=0,
-                    metadata={"error": str(e)},
+
+                score = eval_results.get("results", {}).get(benchmark, {}).get("acc", 0.0)
+                items_total = eval_results.get("results", {}).get(benchmark, {}).get("items", 0)
+                items_correct = eval_results.get("results", {}).get(benchmark, {}).get("correct", 0)
+
+                elapsed = time.time() - start
+                results.append(
+                    QualityResult(
+                        benchmark_name=benchmark,
+                        score=score,
+                        items_total=items_total,
+                        items_correct=items_correct,
+                        metadata={
+                            "elapsed_seconds": elapsed,
+                            "description": info.get("description", ""),
+                        },
+                    )
                 )
-            )
+                print(f"    Score: {score:.4f} ({items_correct}/{items_total}) in {elapsed:.1f}s")
+                progress.update(task, completed=100)
+            except (OSError, RuntimeError) as e:
+                print(f"    Error: {e}")
+                results.append(
+                    QualityResult(
+                        benchmark_name=benchmark,
+                        score=0.0,
+                        items_total=0,
+                        items_correct=0,
+                        metadata={"error": str(e)},
+                    )
+                )
 
     return results

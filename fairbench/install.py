@@ -212,6 +212,10 @@ def cmd_quick_start():
 
 def cmd_init():
     """Interactive setup wizard — creates config, checks dependencies, shows paths."""
+    import click
+
+    from fairbench.config import load_config, save_config
+
     config_dir = Path.home() / ".fairbench"
 
     # Create directory structure
@@ -221,27 +225,59 @@ def cmd_init():
     print(f"   ✓ {config_dir}")
     print()
 
-    # Show current config or create default
+    # Interactive configuration
+    print("⚙️  Configuration Wizard")
+    print("-" * 40)
+    
     config_file = config_dir / "config.yaml"
-    if not config_file.exists():
-        print("📝 Creating default configuration...")
-        from fairbench.config import load_config, save_config
-        config = load_config()
-        save_config(config)
-        print(f"   ✓ Config saved to {config_file}")
-    else:
-        print(f"📋 Config file exists: {config_file}")
-        with open(config_file) as f:
-            import yaml
-            config_data = yaml.safe_load(f) or {}
-        if config_data:
-            print("   Current settings:")
-            for key, value in config_data.items():
-                print(f"     - {key}: {value}")
-
+    existing_config = load_config() if config_file.exists() else None
+    
+    # Ask for leaderboard username
+    username = click.prompt(
+        "👤 Leaderboard username",
+        default=existing_config.api_url.split("/")[-1] if existing_config and "fairbench.vercel.app" in existing_config.api_url else "",
+        show_default=True,
+    )
+    
+    # Ask for publish setting
+    publish = click.confirm(
+        "📤 Enable leaderboard publishing?",
+        default=True,
+    )
+    
+    # Ask for GPU layers
+    gpu_layers = click.prompt(
+        "🎮 Default GPU layers",
+        type=int,
+        default=-1,
+        show_default=True,
+    )
+    
+    # Ask for quantization
+    quant = click.prompt(
+        "📦 Default quantization",
+        default="q4_k_m",
+        show_default=True,
+    )
+    
     print()
 
+    # Create/update config
+    if existing_config:
+        print("✏️  Updating existing configuration...")
+    else:
+        print("📝 Creating new configuration...")
+    
+    config = load_config()
+    config.api_url = f"https://fairbench.vercel.app/api/{username}" if username else config.api_url
+    config.publish = publish
+    config.default_n_gpu_layers = gpu_layers
+    config.default_quant = quant
+    save_config(config)
+    print(f"   ✓ Config saved to {config_file}")
+    
     # Show dependency status
+    print()
     print("🔧 Checking dependencies...")
     deps = check_dependencies()
     for name, status in deps.items():
@@ -264,8 +300,9 @@ def cmd_init():
 
     # Quick start
     print("🚀 Quick start:")
-    print("   1. Place your GGUF model (e.g., ~/models/model.gguf)")
-    print("   2. Run: fairbench run ~/models/model.gguf")
+    print("   1. Download a model: fairbench download Qwen/Qwen2.5-1.5B-Instruct")
+    print("   2. Or place your GGUF model (e.g., ~/models/model.gguf)")
+    print("   3. Run: fairbench run ~/models/model.gguf")
     print()
     print("=" * 60)
 
@@ -289,3 +326,97 @@ def cmd_show_paths():
         print("Package location: (fairbench not installed)")
 
     print("=" * 40 + "\n")
+
+
+def cmd_download(model_id: str, filename: str | None = None, local_dir: str | None = None):
+    """Download a GGUF model from HuggingFace.
+    
+    MODEL_ID is the HuggingFace repository ID (e.g., 'Qwen/Qwen2.5-1.5B-Instruct').
+    FILENAME is optional specific file to download (defaults to first .gguf file found).
+    LOCAL_DIR is where to save (defaults to ~/models/).
+    """
+    from pathlib import Path
+    
+    # Determine target directory
+    target_dir = Path(local_dir) if local_dir else Path.home() / "models"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"\n📥 Downloading model: {model_id}")
+    print(f"   Target directory: {target_dir}")
+    print()
+    
+    # Try using huggingface_hub first
+    try:
+        from huggingface_hub import hf_hub_download, list_repo_files
+        from tqdm import tqdm  # bundled with huggingface_hub
+        
+        files = list_repo_files(model_id, repo_type="model")
+        gguf_files = [f for f in files if f.endswith(".gguf") or "gguf" in f.lower()]
+        
+        if not gguf_files:
+            print("  ❌ No GGUF files found in repository")
+            print("  💡 Try a different model ID that has GGUF variants")
+            return
+        
+        if filename:
+            # Download specific file
+            if filename not in gguf_files:
+                print(f"  ⚠️  '{filename}' not found, available files:")
+                for f in gguf_files[:10]:  # Show first 10
+                    print(f"     - {f}")
+                return
+            
+            local_file = hf_hub_download(
+                repo_id=model_id,
+                filename=filename,
+                local_dir=str(target_dir),
+                force_download=False,
+                tqdm_class=tqdm,
+            )
+        else:
+            # Download first GGUF file
+            selected_file = gguf_files[0]
+            print(f"   Auto-selecting: {selected_file}")
+            local_file = hf_hub_download(
+                repo_id=model_id,
+                filename=selected_file,
+                local_dir=str(target_dir),
+                force_download=False,
+                tqdm_class=tqdm,
+            )
+        
+        print("\n  ✅ Model downloaded successfully!")
+        print(f"   Saved to: {local_file}")
+        print()
+        print("  🚀 Run benchmark:")
+        print(f"     fairbench run {local_file}")
+        
+    except ImportError:
+        # Fallback to huggingface-cli
+        print("  ℹ️  Using huggingface-cli (huggingface_hub not installed)")
+        import subprocess
+        
+        cmd = ["huggingface-cli", "download", model_id, "--local-dir", str(target_dir)]
+        
+        if filename:
+            cmd.extend(["--include", filename])
+        else:
+            # Try to download only GGUF files
+            print("  ⚠️  No filename specified. Use --filename to select specific GGUF file.")
+            print(f"     Example: fairbench download {model_id} --filename Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
+            return
+        
+        try:
+            result = subprocess.run(cmd, capture_output=False, check=False)
+            if result.returncode == 0:
+                print(f"\n  ✅ Model downloaded successfully to {target_dir}")
+            else:
+                print("\n  ❌ Download failed. Make sure you have huggingface-cli installed:")
+                print("     pip install huggingface_hub")
+        except FileNotFoundError:
+            print("\n  ❌ huggingface-cli not found.")
+            print("  💡 Install with:")
+            print("     pip install huggingface_hub")
+            print()
+            print("  Then run:")
+            print(f"     huggingface-cli download {model_id} --local-dir {target_dir}")

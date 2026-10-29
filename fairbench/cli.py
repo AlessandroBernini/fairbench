@@ -20,7 +20,8 @@ def cli(ctx, config_path):
     Evaluate your GGUF models across quality, speed, memory, and coding benchmarks.
 
     Quick Start:
-      fairbench init          Set up FairBench interactively
+      fairbench init          Interactive setup wizard
+      fairbench download      Download a GGUF model from HuggingFace
       fairbench verify        Check system readiness
       fairbench run MODEL     Benchmark a GGUF model
       fairbench show-paths    Show config & results locations
@@ -28,6 +29,8 @@ def cli(ctx, config_path):
       fairbench list-benchmarks  List available quality benchmarks
 
     Examples:
+      fairbench init
+      fairbench download Qwen/Qwen2.5-1.5B-Instruct
       fairbench run ~/models/qwen2.5-7b.gguf
       fairbench run model.gguf --category quality --tasks mmlu hellaswag
       fairbench run model.gguf --category speed
@@ -43,6 +46,24 @@ def init():
     """Interactive setup wizard — creates config, checks dependencies, shows paths."""
     from fairbench.install import cmd_init
     cmd_init()
+
+
+@click.command("download")
+@click.argument("model_id", required=True)
+@click.option("--filename", "-f", help="Specific GGUF file to download")
+@click.option("--local-dir", "-d", default=None, help="Target directory (default: ~/models/)")
+def download(model_id, filename, local_dir):
+    """Download a GGUF model from HuggingFace.
+    
+    MODEL_ID is the HuggingFace repository ID (e.g., 'Qwen/Qwen2.5-1.5B-Instruct').
+    
+    Examples:
+    \\b
+    fairbench download Qwen/Qwen2.5-1.5B-Instruct
+    fairbench download Qwen/Qwen2.5-1.5B-Instruct --filename Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+    """
+    from fairbench.install import cmd_download
+    cmd_download(model_id=model_id, filename=filename, local_dir=local_dir)
 
 
 @cli.command("show-paths")

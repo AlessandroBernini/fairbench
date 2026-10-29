@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from fairbench.data import DataManager
 from fairbench.types import BenchmarkConfig, SWEbenchResult
@@ -454,41 +455,54 @@ Generate the patch:
         print(f"  Evaluating {len(instances)} SWE-bench instance(s)...")
 
         results = []
-        for i, instance in enumerate(instances):
-            print(f"  [{i + 1}/{len(instances)}] {instance.instance_id} ({instance.repo})")
+        total = len(instances)
 
-            start = time.time()
-            try:
-                # Generate patch
-                patch = self.generate_patch(
-                    instance=instance,
-                    model_path=model_path,
-                )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]SWE[/]  {task.description}"),
+            BarColumn(),
+            TextColumn("{task.percentage:.0f}%"),
+            refresh_per_second=1,
+        ) as progress:
+            for idx, instance in enumerate(instances, start=1):
+                task_name = f"Instance {idx}/{total}: {instance.instance_id}"
+                task = progress.add_task(task_name, total=100)
 
-                # Evaluate
-                result = self.evaluate_instance(
-                    instance=instance,
-                    patch=patch,
-                    apply_patch=apply_patch,
-                )
-                result.metadata["elapsed_seconds"] = time.time() - start
-                result.metadata["patch_length"] = len(patch)
+                print(f"\n  [{idx}/{total}] {instance.instance_id} ({instance.repo})")
 
-                results.append(result)
-                status = "RESOLVED" if result.resolved else "FAILED"
-                print(f"    [{status}] in {result.metadata.get('elapsed_seconds', 0):.1f}s")
-
-            except (OSError, RuntimeError) as e:
-                print(f"    ERROR: {e}")
-                results.append(
-                    SWEbenchResult(
-                        repo_name=instance.repo,
-                        instance_id=instance.instance_id,
-                        resolved=False,
-                        test_results={"error": str(e)},
-                        metadata={"error": str(e)},
+                start = time.time()
+                try:
+                    # Generate patch
+                    patch = self.generate_patch(
+                        instance=instance,
+                        model_path=model_path,
                     )
-                )
+
+                    # Evaluate
+                    result = self.evaluate_instance(
+                        instance=instance,
+                        patch=patch,
+                        apply_patch=apply_patch,
+                    )
+                    result.metadata["elapsed_seconds"] = time.time() - start
+                    result.metadata["patch_length"] = len(patch)
+
+                    results.append(result)
+                    status = "RESOLVED" if result.resolved else "FAILED"
+                    print(f"    [{status}] in {result.metadata.get('elapsed_seconds', 0):.1f}s")
+                    progress.update(task, completed=100)
+
+                except (OSError, RuntimeError) as e:
+                    print(f"    ERROR: {e}")
+                    results.append(
+                        SWEbenchResult(
+                            repo_name=instance.repo,
+                            instance_id=instance.instance_id,
+                            resolved=False,
+                            test_results={"error": str(e)},
+                            metadata={"error": str(e)},
+                        )
+                    )
 
         return results
 
