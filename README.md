@@ -17,7 +17,7 @@ fairbench init
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
 
-> **Note:** `fairbench-ai[all]` automatically installs `llama-cpp-python` as well. If it fails, the script will guide you through manual installation. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`).
+> **Note:** `fairbench-ai[all]` automatically installs `llama-cpp-python` as well. If it fails, the script will guide you through manual installation. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`). Auto-version bumping is enabled on push to main.
 
 ## Benchmarks
 
