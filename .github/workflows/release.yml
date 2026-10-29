@@ -18,6 +18,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Configure git
+        run: |
+          git config --global user.email "ci@fairbench.dev"
+          git config --global user.name "FairBench CI"
+
       - name: Determine version
         run: |
           pip install gh
