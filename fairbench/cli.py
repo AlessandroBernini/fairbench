@@ -437,5 +437,25 @@ def results_cmd(ctx, category):
         click.echo(f"  {r}")
 
 
+@cli.command("init")
+@click.pass_context
+def init_cmd(ctx):
+    """Initialize FairBench configuration.
+
+    Creates ~/.fairbench/config.yaml with sensible defaults if it doesn't already exist.
+    """
+    from fairbench.config import CONFIG_PATH, _default_config, save_config
+
+    if CONFIG_PATH.exists():
+        click.echo(f"⚠️  Config already exists at {CONFIG_PATH}")
+        click.echo("   Delete it first or use 'fairbench config --show' to inspect.")
+        return
+
+    config = _default_config()
+    save_config(config)
+    click.echo(f"✅ Config created at {CONFIG_PATH}")
+    click.echo("   Edit it with: fairbench config --set key=value")
+
+
 if __name__ == "__main__":
     cli()
