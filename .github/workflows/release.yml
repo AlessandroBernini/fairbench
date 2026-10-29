@@ -41,7 +41,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           pip install twine
-          VERSION=$(python -c "import re; print(re.search(r'version\s*=\s*\"(\d+\.\d+\.\d+)\"", open('pyproject.toml').read()).group(1))"
+          VERSION=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
           echo "Publishing version: $VERSION"
           if twine upload dist/* 2>&1 | grep -q "File already exists"; then
             echo "⚠️ Version $VERSION already exists on PyPI. Skipping."
