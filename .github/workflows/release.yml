@@ -23,6 +23,9 @@ jobs:
           pip install gh
           python scripts/bump_version.py
 
+      - name: Clean build artifacts
+        run: rm -rf dist/ build/ *.egg-info
+
       - name: Build package
         run: |
           pip install build && python -m build
@@ -33,4 +36,10 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           pip install twine
-          twine upload dist/* --skip-existing
+          VERSION=$(python -c "import re; print(re.search(r'version\s*=\s*\"(\d+\.\d+\.\d+)\"", open('pyproject.toml').read()).group(1))"
+          echo "Publishing version: $VERSION"
+          if twine upload dist/* 2>&1 | grep -q "File already exists"; then
+            echo "⚠️ Version $VERSION already exists on PyPI. Skipping."
+          else
+            echo "✅ Published successfully!"
+          fi
