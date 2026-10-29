@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Automatically determine version bump based on PR title and update pyproject.toml."""
 
-import os
 import re
 import subprocess
 import sys
@@ -24,6 +23,14 @@ def get_latest_pypi_version(package_name="fairbench-ai"):
         return versions[0] if versions else None
     except Exception:
         return None
+
+
+def get_local_version():
+    """Read current version from pyproject.toml."""
+    pyproject = Path("pyproject.toml")
+    content = pyproject.read_text()
+    match = re.search(r'version\s*=\s*"(\d+\.\d+\.\d+)"', content)
+    return match.group(1) if match else None
 
 
 def determine_bump(commit_msg):
@@ -84,30 +91,47 @@ def main():
     bump_type = determine_bump(commit_msg)
     print(f"Determined bump type: {bump_type}")
 
-    # 4. Get latest version from PyPI (source of truth), fallback to local pyproject.toml
+    # 4. Get latest version from PyPI (source of truth)
     pypi_version = get_latest_pypi_version()
-    current_version_str: str | None = None
 
-    if pypi_version:
-        current_version_str = pypi_version
-        print(f"Using PyPI version as source of truth: {current_version_str}")
-    else:
-        # Fallback to local pyproject.toml
-        pyproject = Path("pyproject.toml")
-        content = pyproject.read_text()
-        match = re.search(r'version\s*=\s*"(\d+\.\d+\.\d+)"', content)
-        if not match:
-            print("Error: Could not parse current version from pyproject.toml or PyPI.")
+    if not pypi_version:
+        # No PyPI data available — trust local pyproject.toml
+        local_version = get_local_version()
+        if not local_version:
+            print("Error: Could not parse version from pyproject.toml.")
             sys.exit(1)
-        current_version_str = match.group(1)
-        print(f"Using local version as fallback: {current_version_str}")
+        current_version_str = local_version
+        print(f"Using local version (no PyPI data): {current_version_str}")
+        # Bump from local version
+        match = re.search(r'(\d+)\.(\d+)\.(\d+)', local_version)
+        major, minor, patch = map(int, match.groups())
+        if bump_type == "minor":
+            new_version = f"{major}.{minor + 1}.0"
+        else:
+            new_version = f"{major}.{minor}.{patch + 1}"
+        print(f"Bumping version: {local_version} -> {new_version}")
+        update_version_file(new_version)
+        commit_and_push(new_version)
+        print(f"Committed and pushed version bump to {new_version}")
+        return
 
-    if current_version_str is None:
-        print("Error: No valid version found.")
+    # PyPI data available — compare local pyproject.toml with PyPI
+    local_version = get_local_version()
+    if not local_version:
+        print("Error: Could not parse version from pyproject.toml.")
         sys.exit(1)
 
-    # 5. Parse and calculate new version
-    match = re.search(r'(\d+)\.(\d+)\.(\d+)', current_version_str)
+    current_version_str = local_version
+    print(f"Local pyproject.toml version: {current_version_str}")
+    print(f"Latest PyPI version: {pypi_version}")
+
+    # Only bump if local version matches PyPI (meaning no bump happened yet for this commit)
+    if local_version != pypi_version:
+        print(f"Local ({local_version}) != PyPI ({pypi_version}). Bump already happened or out of sync. Skipping.")
+        return
+
+    # Calculate new version from PyPI
+    match = re.search(r'(\d+)\.(\d+)\.(\d+)', pypi_version)
     major, minor, patch = map(int, match.groups())
 
     if bump_type == "minor":
@@ -115,21 +139,11 @@ def main():
     else:
         new_version = f"{major}.{minor}.{patch + 1}"
 
-    print(f"Bumping version: {current_version_str} -> {new_version}")
+    print(f"Bumping version: {pypi_version} -> {new_version}")
 
-    # 6. Check if bump is needed (avoid duplicate bumps)
-    if pypi_version and current_version_str == pypi_version:
-        print(f"Local version matches PyPI, bumping to {new_version}")
-        update_version_file(new_version)
-        commit_and_push(new_version)
-    elif not pypi_version:
-        # No PyPI data available, trust local state
-        update_version_file(new_version)
-        commit_and_push(new_version)
-    else:
-        print(f"PyPI version ({pypi_version}) differs from local. Skipping to avoid conflicts.")
-        return
-
+    # Update pyproject.toml and commit
+    update_version_file(new_version)
+    commit_and_push(new_version)
     print(f"Committed and pushed version bump to {new_version}")
 
 
