@@ -5,15 +5,17 @@ from __future__ import annotations
 import click
 from importlib import metadata
 
-try:
-    _cli_version = metadata.version("fairbench-ai")
-except metadata.PackageNotFoundError:
-    _cli_version = "0.0.0.dev"  # CI/dev fallback
-
 from fairbench.config import load_config, save_config
 from fairbench.engine import BenchmarkEngine
 from fairbench.swebench import SWEBENCH_SOURCES
 from fairbench.types import BenchmarkCategory
+
+
+# Resolve version at module load time (handles CI where package isn't installed)
+try:
+    _cli_version = metadata.version("fairbench-ai")
+except metadata.PackageNotFoundError:
+    _cli_version = "0.0.0.dev"  # dev/CI fallback
 
 
 @click.group()
