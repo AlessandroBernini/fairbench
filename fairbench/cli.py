@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from importlib import metadata
+
 import click
 
 from fairbench.config import load_config, save_config
@@ -9,9 +11,15 @@ from fairbench.engine import BenchmarkEngine
 from fairbench.swebench import SWEBENCH_SOURCES
 from fairbench.types import BenchmarkCategory
 
+# Resolve version at module load time (handles CI where package isn't installed)
+try:
+    _cli_version = metadata.version("fairbench-ai")
+except metadata.PackageNotFoundError:
+    _cli_version = "0.0.0.dev"  # dev/CI fallback
+
 
 @click.group()
-@click.version_option(version="0.3.0")
+@click.version_option(version=_cli_version, prog_name="FairBench")
 @click.option("--config", "-c", "config_path", help="Path to config file", default=None)
 @click.pass_context
 def cli(ctx, config_path):
@@ -58,7 +66,7 @@ def download(model_id, filename, local_dir):
     MODEL_ID is the HuggingFace repository ID (e.g., 'Qwen/Qwen2.5-1.5B-Instruct').
     
     Examples:
-    \\b
+    \b
     fairbench download Qwen/Qwen2.5-1.5B-Instruct
     fairbench download Qwen/Qwen2.5-1.5B-Instruct --filename Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
     """
@@ -99,13 +107,13 @@ def quick_start():
     "category",
     type=click.Choice(["quality", "speed", "memory", "swebench", "all"]),
     default="all",
-    help="Benchmark category to run",
+    help="Benchmark category to run (-k shorthand)",
 )
-@click.option("--tasks", "-t", "tasks", multiple=True, help="Specific quality benchmarks to run")
-@click.option("--n-ctx", "-n", default=None, type=int, help="Context window size")
-@click.option("--n-gpu-layers", "-g", default=None, type=int, help="GPU layers to offload")
-@click.option("--n-threads", "-j", default=None, type=int, help="CPU threads")
-@click.option("--quant", "-q", default=None, help="Quantization type")
+@click.option("--tasks", "-t", "tasks", multiple=True, help="Specific quality benchmarks to run (-t shorthand)")
+@click.option("--n-ctx", "-n", default=None, type=int, help="Context window size (-n shorthand)")
+@click.option("--n-gpu-layers", "-g", default=None, type=int, help="GPU layers to offload (-g shorthand)")
+@click.option("--n-threads", "-j", default=None, type=int, help="CPU threads (-j shorthand)")
+@click.option("--quant", "-q", default=None, help="Quantization type (-q shorthand)")
 @click.option("--lite/--no-lite", default=None, help="Use lite mode for quality benchmarks")
 @click.option(
     "--swebench-split",
@@ -113,7 +121,7 @@ def quick_start():
     "swebench_split",
     type=click.Choice(list(SWEBENCH_SOURCES.keys())),
     default=None,
-    help="SWE-bench split to use",
+    help="SWE-bench split to use (-s shorthand)",
 )
 @click.option(
     "--swebench-limit",
@@ -121,7 +129,7 @@ def quick_start():
     "swebench_limit",
     type=int,
     default=None,
-    help="Limit SWE-bench instances",
+    help="Limit SWE-bench instances (-l shorthand)",
 )
 @click.option("--publish/--no-publish", default=None, help="Override publish setting")
 @click.pass_context
@@ -256,9 +264,9 @@ def list_benchmarks(ctx):
     "split",
     type=click.Choice(list(SWEBENCH_SOURCES.keys())),
     default="full",
-    help="SWE-bench split",
+    help="SWE-bench split (-s shorthand)",
 )
-@click.option("--limit", "-l", type=int, default=10, help="Number of instances to show")
+@click.option("--limit", "-l", type=int, default=10, help="Number of instances to show (-l shorthand)")
 @click.pass_context
 def list_swebench(ctx, split, limit):
     """List available SWE-bench instances."""
@@ -284,10 +292,10 @@ def list_swebench(ctx, split, limit):
     "split",
     type=click.Choice(list(SWEBENCH_SOURCES.keys())),
     default="full",
-    help="SWE-bench split",
+    help="SWE-bench split (-s shorthand)",
 )
-@click.option("--limit", "-l", type=int, default=5, help="Number of instances to evaluate")
-@click.option("--repo-filter", "-r", "repo_filter", help="Filter by repository")
+@click.option("--limit", "-l", type=int, default=5, help="Number of instances to evaluate (-l shorthand)")
+@click.option("--repo-filter", "-r", "repo_filter", help="Filter by repository (-r shorthand)")
 @click.pass_context
 def swebench_eval(ctx, model_path, split, limit, repo_filter):
     """Run SWE-bench evaluation on a model.
@@ -337,8 +345,8 @@ def swebench_eval(ctx, model_path, split, limit, repo_filter):
 
 
 @cli.command("config")
-@click.option("--show", "-s", "show", is_flag=True, help="Show current config")
-@click.option("--set", "-S", "set_kv", multiple=True, help="Set config key=value")
+@click.option("--show", "-s", "show", is_flag=True, help="Show current config (-s shorthand)")
+@click.option("--set", "-S", "set_kv", multiple=True, help="Set config key=value (-S shorthand)")
 @click.pass_context
 def config_cmd(ctx, show, set_kv):
     """Manage FairBench configuration."""
@@ -385,7 +393,7 @@ def config_cmd(ctx, show, set_kv):
 
 
 @cli.command("leaderboard")
-@click.option("--limit", "-l", type=int, default=20, help="Number of results to show")
+@click.option("--limit", "-l", type=int, default=20, help="Number of results to show (-l shorthand)")
 @click.pass_context
 def leaderboard(ctx, limit):
     """Show the leaderboard."""
@@ -421,7 +429,7 @@ def leaderboard(ctx, limit):
 
 
 @cli.command("results")
-@click.option("--category", "-c", help="Filter by category")
+@click.option("--category", "-c", help="Filter by category (-c shorthand)")
 @click.pass_context
 def results_cmd(ctx, category):
     """List local benchmark results."""
