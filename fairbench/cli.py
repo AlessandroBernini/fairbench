@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import click
 from importlib import metadata
+
+import click
 
 from fairbench.config import load_config, save_config
 from fairbench.engine import BenchmarkEngine
