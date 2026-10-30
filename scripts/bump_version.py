@@ -115,24 +115,27 @@ def main():
         print(f"Committed and pushed version bump to {new_version}")
         return
 
-    # PyPI data available — compare local pyproject.toml with PyPI
+    # PyPI data available — use PyPI as the authoritative base version
     local_version = get_local_version()
     if not local_version:
         print("Error: Could not parse version from pyproject.toml.")
         sys.exit(1)
 
-    current_version_str = local_version
-    print(f"Local pyproject.toml version: {current_version_str}")
-    print(f"Latest PyPI version: {pypi_version}")
+    def _ver(v):
+        """Parse 'X.Y.Z' into comparable tuple (X, Y, Z)."""
+        return tuple(int(x) for x in v.split('.'))
 
-    # Only bump if local version matches PyPI (meaning no bump happened yet for this commit)
-    if local_version != pypi_version:
-        print(f"Local ({local_version}) != PyPI ({pypi_version}). Bump already happened or out of sync. Skipping.")
+    print(f"Local pyproject.toml version: {local_version}")
+    print(f"Latest PyPI version:          {pypi_version}")
+
+    # Skip only if local is strictly ahead of PyPI (manual publish without PyPI upload).
+    # If local <= PyPI, bump from PyPI to keep main synchronized with releases.
+    if _ver(local_version) > _ver(pypi_version):
+        print(f"Local ({local_version}) > PyPI ({pypi_version}). Skipping bump to avoid conflict.")
         return
 
-    # Calculate new version from PyPI
-    match = re.search(r'(\d+)\.(\d+)\.(\d+)', pypi_version)
-    major, minor, patch = map(int, match.groups())
+    # Calculate new version from PyPI (source of truth)
+    major, minor, patch = _ver(pypi_version)
 
     if bump_type == "minor":
         new_version = f"{major}.{minor + 1}.0"
