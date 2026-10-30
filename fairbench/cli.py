@@ -1,9 +1,7 @@
 """CLI for FairBench."""
 
 from __future__ import annotations
-
 from importlib import metadata
-
 import click
 
 from fairbench.config import load_config, save_config
