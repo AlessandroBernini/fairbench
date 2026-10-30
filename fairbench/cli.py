@@ -10,6 +10,7 @@ from fairbench.config import load_config, save_config
 from fairbench.engine import BenchmarkEngine
 from fairbench.swebench import SWEBENCH_SOURCES
 from fairbench.types import BenchmarkCategory
+
 # Resolve version at module load time (handles CI where package isn't installed)
 try:
     _cli_version = metadata.version("fairbench-ai")
