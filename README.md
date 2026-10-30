@@ -75,6 +75,20 @@ fairbench run ~/models/model.gguf --category swebench --swebench-split verified 
 
 # Custom context window and GPU layers
 fairbench run ~/models/model.gguf --n-ctx 8192 --n-gpu-layers 30
+
+# CPU threads and quantization (not in README before)
+fairbench run ~/models/model.gguf --n-threads 8 --quant q5_k_m
+
+# Category shorthand (-k), tasks shorthand (-t), lite flag
+fairbench run model.gguf -k quality -t mmlu,ifeval --lite
+```
+
+### SWE-bench dedicated command
+
+```bash
+# Run SWE-bench evaluation directly (not via 'run')
+fairbench swebench-eval ~/models/model.gguf --split lite --limit 10
+fairbench swebench-eval model.gguf -s verified -r flask --limit 5
 ```
 
 ### List available benchmarks
@@ -88,12 +102,14 @@ fairbench list-swebench
 
 ```bash
 fairbench results
+fairbench results --category quality
 ```
 
 ### View leaderboard
 
 ```bash
 fairbench leaderboard
+fairbench leaderboard -l 50
 ```
 
 ### Manage configuration
@@ -106,6 +122,7 @@ fairbench config --set key=value  # Set a config value
 ## Tools
 
 ### Download models
+
 Download GGUF models directly from HuggingFace:
 
 ```bash
@@ -124,6 +141,7 @@ fairbench download Qwen/Qwen2.5-1.5B-Instruct \
 Models are saved to `~/models/` by default. Download progress is shown with a terminal progress bar (percentage, speed, ETA).
 
 ### Verify system
+
 Check FairBench installation and system readiness:
 
 ```bash
@@ -133,6 +151,7 @@ fairbench verify
 Validates Python version, dependencies (lm-eval, llama-cpp-python), disk space, and config.
 
 ### Quick start demo
+
 Show a demo plan with available benchmarks and models:
 
 ```bash
@@ -164,6 +183,9 @@ default_quant: q4_k_m
 default_threads: 0
 publish: true
 results_dir: ~/.fairbench/results
+lite_mode: auto
+swebench_instances: 0
+swebench_split: full
 ```
 
 | Key | Default | Description |
@@ -175,6 +197,9 @@ results_dir: ~/.fairbench/results
 | `default_threads` | `0` | CPU threads (0 = auto) |
 | `publish` | `true` | Auto-publish results to leaderboard |
 | `results_dir` | `~/.fairbench/results` | Local results storage |
+| `lite_mode` | `auto` | Lite mode: `auto`, `enabled`, or `disabled` |
+| `swebench_instances` | `0` | SWE-bench instance limit (0 = unlimited) |
+| `swebench_split` | `full` | Default SWE-bench split (`full`, `lite`, `verified`) |
 
 ## Publishing
 
