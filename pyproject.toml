@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fairbench-ai"
-version = "0.5.4"
+version = "0.5.5"
 description = "FairBench - AI model benchmarking suite with SWE-bench integration"
 readme = "README.md"
 license = {text = "Apache-2.0"}
