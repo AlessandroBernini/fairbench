@@ -5,6 +5,11 @@ from __future__ import annotations
 import click
 from importlib import metadata
 
+try:
+    _cli_version = metadata.version("fairbench-ai")
+except metadata.PackageNotFoundError:
+    _cli_version = "0.0.0.dev"  # CI/dev fallback
+
 from fairbench.config import load_config, save_config
 from fairbench.engine import BenchmarkEngine
 from fairbench.swebench import SWEBENCH_SOURCES
@@ -12,10 +17,7 @@ from fairbench.types import BenchmarkCategory
 
 
 @click.group()
-@click.version_option(
-    version=metadata.version("fairbench-ai"),
-    prog_name="FairBench",
-)
+@click.version_option(version=_cli_version, prog_name="FairBench")
 @click.option("--config", "-c", "config_path", help="Path to config file", default=None)
 @click.pass_context
 def cli(ctx, config_path):
