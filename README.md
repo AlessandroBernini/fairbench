@@ -7,8 +7,8 @@ Evaluate AI models across multiple dimensions: quality, speed, memory usage, and
 ## Quick Start
 
 ```bash
-# Install everything (core + LM evaluation + SWE-bench)
-pip install fairbench-ai[all]
+# Install FairBench (includes all benchmarking dependencies)
+pip install fairbench-ai
 
 # Interactive setup wizard (creates config, checks dependencies)
 fairbench init
@@ -17,7 +17,7 @@ fairbench init
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
 
-> **Note:** `fairbench-ai[all]` automatically installs `llama-cpp-python` as well. If it fails, the script will guide you through manual installation. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`). Auto-version bumping is enabled on push to main.
+> **Note:** llama-cpp-python is required for speed/memory benchmarks. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`). Auto-version bumping is enabled on push to main.
 
 ## Benchmarks
 
@@ -182,19 +182,18 @@ By default, every benchmark run is **automatically published** to the public lea
 
 ## Optional Dependencies
 
-FairBench installs core dependencies automatically with `pip install fairbench-ai`.
+Core features (quality benchmarks, SWE-bench, CLI) work out of the box with `pip install fairbench-ai`.
+
+Additional components:
 
 ```bash
-# All components (lm-eval + llama-cpp-python + swebench)
-pip install fairbench-ai[all]
+# Speed/memory benchmarks (requires llama-cpp-python, compiled from source)
+pip install llama-cpp-python
 
-# ML benchmarks only (lm-eval, llama-cpp-python)
-pip install fairbench-ai[ml]
+# Model download helper (used by 'fairbench download')
+pip install huggingface_hub
 
-# SWE-bench evaluation
-pip install fairbench-ai[swebench]
-
-# Development (pytest, ruff, mypy, huggingface-hub)
+# Development tools (pytest, ruff, mypy)
 pip install fairbench-ai[dev]
 ```
 
