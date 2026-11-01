@@ -5,96 +5,84 @@ Usage:
     python scripts/cron/discover_models.py
 
 Outputs a markdown file with proposed new models for review.
+
+Requires huggingface_hub >= 2.0 (list_models API changes).
 """
 
-import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 try:
-    from huggingface_hub import HfApi, list_models, ModelSearchArguments
+    from huggingface_hub import HfApi
 except ImportError:
     print("❌ Install huggingface_hub: pip install huggingface_hub")
     sys.exit(1)
 
 
-def discover_new_gguf_models(days_threshold: int = 30) -> list[dict]:
-    """Discover new GGUF models from HuggingFace."""
+def discover_new_gguf_models(days_threshold: int = 30, max_scan: int = 2000) -> list[dict]:
+    """Discover new GGUF models from HuggingFace.
+
+    Uses the huggingface_hub v2+ API with list_models(filter='gguf').
+    Scans most recently created GGUF repos and filters by creation date.
+    NOTE: model_info() must be called to get actual file lists (siblings).
+    """
     api = HfApi()
     new_models = []
-    
-    # Search for recent GGUF models
-    # We search for models with "gguf" in their tags or filenames
-    search_args = ModelSearchArguments()
-    
-    # Get recent models with GGUF tag
-    models = list_models(
-        sort="downloads",
-        direction=-1,
-        full=True,
-    )
-    
     seen_repos = set()
-    
-    for model in models:
-        if len(new_models) >= 50:  # Limit results
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_threshold)
+
+    # Sort by created_at to find newest GGUF models
+    for model in api.list_models(filter="gguf", sort="created_at", limit=max_scan):
+        if len(new_models) >= 50:
             break
-            
+
         repo_id = model.id
         if repo_id in seen_repos:
             continue
-        seen_repos.add(repo_id)
-        
-        # Check if GGUF
-        tags = getattr(model, 'tags', []) or []
-        if 'gguf' not in [t.lower() for t in tags]:
+
+        # Check creation date (created_at is already a datetime in huggingface_hub v2+)
+        created = getattr(model, "created_at", None)
+        if not created or created < cutoff_date:
             continue
-            
-        # Check creation date
-        created = getattr(model, 'created_at', None)
-        if not created:
-            continue
-            
+
+        # NOTE: siblings from list_models is empty; must call model_info() to get files
         try:
-            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-            age_days = (datetime.now(timezone.utc) - created_dt).days
-        except (ValueError, AttributeError):
+            full_info = api.model_info(repo_id)
+        except Exception:
             continue
-            
-        if age_days > days_threshold:
-            continue
-            
-        # Check if it has quantized variants
-        model_info = api.model_info(repo_id)
-        siblings = getattr(model_info, 'siblings', None) or []
-        gguf_files = [f.rfilename for f in siblings if f.rfilename.lower().endswith('.gguf')]
-        
+
+        siblings = getattr(full_info, "siblings", None) or []
+        gguf_files = [
+            s.rfilename for s in siblings
+            if s.rfilename and s.rfilename.lower().endswith(".gguf")
+        ]
         if not gguf_files:
             continue
-            
+
         # Determine best quantization (prefer Q4_K_M)
         quant = "q4_k_m"
-        for f in gguf_files:
-            if "q4_k_m" in f.lower():
+        for fpath in gguf_files:
+            if "q4_k_m" in fpath.lower():
                 quant = "q4_k_m"
                 break
-            elif "q4_k" in f.lower():
+            elif "q4_k" in fpath.lower():
                 quant = "q4_k"
                 break
-                
+
         # Estimate parameters from repo name
         size_b = _estimate_size(repo_id)
-        
+
         new_models.append({
             "repo": repo_id,
             "file_pattern": f"{repo_id.split('/')[-1]}-{quant}.gguf",
             "size_b": size_b,
             "context": _estimate_context(repo_id),
-            "age_days": age_days,
-            "downloads": getattr(model, 'downloads', 0) or 0,
+            "age_days": (datetime.now(timezone.utc) - created).days,
+            "downloads": getattr(model, "downloads", 0) or 0,
         })
-    
+        seen_repos.add(repo_id)
+
     return new_models
 
 
