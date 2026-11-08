@@ -26,17 +26,24 @@ jobs:
       - name: Run discovery script
         run: python scripts/cron/discover_models.py
 
-      - name: Check for new models
+      - name: Commit report
         run: |
-          if [ -f discovered/new-models-*.md ]; then
-            echo "New models discovered!"
-            cat discovered/new-models-*.md
-          else
-            echo "No new models found."
-          fi
+          git config --global user.name "fairbench-bot"
+          git config --global user.email "fairbench-bot@users.noreply.github.com"
+          git add discovered/
+          git diff --cached --quiet || git commit -m "chore: update model discovery report"
+
+      - name: Check for new models
+        id: check
+        run: |
+          REPORT=$(cat discovered/new-models-*.md)
+          echo "$REPORT"
+          COUNT=$(echo "$REPORT" | grep -c '^| \`' || true)
+          echo "new_count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "report=$REPORT" >> "$GITHUB_OUTPUT"
 
       - name: Create PR for new models
-        if: success()
+        if: steps.check.outputs.new_count > '0'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
