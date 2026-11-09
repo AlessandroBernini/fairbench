@@ -40,7 +40,8 @@ jobs:
           echo "$REPORT"
           COUNT=$(echo "$REPORT" | grep -c '^| \`' || true)
           echo "new_count=$COUNT" >> "$GITHUB_OUTPUT"
-          echo "report=$REPORT" >> "$GITHUB_OUTPUT"
+          # Write report to a temp file to avoid GITHUB_OUTPUT parsing issues with markdown
+          echo "$REPORT" > /tmp/discovered-report.md
 
       - name: Create PR for new models
         if: steps.check.outputs.new_count > '0'
