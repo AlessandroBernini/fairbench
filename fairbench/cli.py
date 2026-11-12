@@ -102,6 +102,21 @@ def quick_start():
     cmd_quick_start()
 
 
+def _resolve_model_path(model_path: str) -> str:
+    """Resolve a model name or path through the catalog."""
+    from fairbench.models import ModelCatalog
+
+    if os.path.isfile(model_path):
+        return model_path
+
+    catalog = ModelCatalog()
+    info = catalog.get_model(model_path)
+    if info:
+        return str(info.path)
+
+    return model_path
+
+
 @cli.command()
 @click.argument("model_path")
 @click.option(
@@ -152,7 +167,7 @@ def run(
 ):
     """Run benchmarks on a model.
 
-    MODEL_PATH is the path to the GGUF model file.
+    MODEL_PATH is the path to the GGUF model file or a catalog name.
 
     Examples:
     \b
@@ -160,7 +175,11 @@ def run(
     fairbench run ~/models/model.gguf --category quality --tasks mmlu hellaswag
     fairbench run ~/models/model.gguf --category swebench --swebench-split lite
     fairbench run ~/models/model.gguf --category all --lite
+    fairbench run qwen2.5-7b  # Uses catalog name
     """
+    # Resolve catalog name → file path
+    resolved_path = _resolve_model_path(model_path)
+
     config = ctx.obj["config"]
 
     # Override publish setting if specified
@@ -184,7 +203,7 @@ def run(
     if category == "swebench" or (category == "all" and swebench_split):
         lite_mode = "enabled" if lite else "disabled"
         engine.run_benchmark(
-            model_path=model_path,
+            model_path=resolved_path,
             category=BenchmarkCategory.SWE_BENCH,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -201,7 +220,7 @@ def run(
     if category == "all":
         # Run all benchmarks
         engine.run_benchmark(
-            model_path=model_path,
+            model_path=resolved_path,
             category=BenchmarkCategory.QUALITY,
             tasks=list(tasks) if tasks else None,
             n_ctx=n_ctx,
@@ -211,7 +230,7 @@ def run(
             lite_mode="enabled" if lite else "disabled",
         )
         engine.run_benchmark(
-            model_path=model_path,
+            model_path=resolved_path,
             category=BenchmarkCategory.SPEED,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -219,7 +238,7 @@ def run(
             quantization=quant,
         )
         engine.run_benchmark(
-            model_path=model_path,
+            model_path=resolved_path,
             category=BenchmarkCategory.MEMORY,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -233,7 +252,7 @@ def run(
         return
 
     engine.run_benchmark(
-        model_path=model_path,
+        model_path=resolved_path,
         category=cat,
         tasks=list(tasks) if tasks else None,
         n_ctx=n_ctx,
@@ -548,6 +567,176 @@ def report_cmd(ctx, run_id, open_browser):
     click.echo(f"✅ Report generated: {report_path}")
     if not open_browser:
         click.echo("   Open it with: fairbench report run_123 --open")
+
+
+@cli.group("models")
+def models_cmd():
+    """Manage local GGUF model catalog.
+
+    Discover, index, and manage your local GGUF models.
+
+    Examples:
+    \\b
+    fairbench models list
+    fairbench models search qwen
+    fairbench models info ~/models/qwen2.5-7b.gguf
+    fairbench models add ~/my-model.gguf
+    fairbench models remove qwen2.5-7b
+    """
+    pass
+
+
+@models_cmd.command("list")
+@click.option("--scan/--no-scan", default=False, help="Force rescan before listing")
+def models_list(scan):
+    """List all discovered models."""
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    if scan:
+        catalog.scan()
+
+    models = catalog.list_models()
+    if not models:
+        click.echo("No models found. Run 'fairbench models list --scan' to discover.")
+        return
+
+    click.echo(f"\nLocal Models ({len(models)}):")
+    click.echo("-" * 80)
+    click.echo(f"  {'Name':<35s} {'Arch':<12s} {'Size (GB)':>10s} {'Quant':<10s}")
+    click.echo("-" * 80)
+    for m in models:
+        click.echo(
+            f"  {m.name:<35s} {m.architecture:<12s} {m.file_size_gb:>10.2f} {m.quantization:<10s}"
+        )
+    click.echo()
+
+
+@models_cmd.command("search")
+@click.argument("pattern")
+@click.option("--scan/--no-scan", default=False, help="Force rescan before searching")
+def models_search(pattern, scan):
+    """Search for models by name pattern."""
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    if scan:
+        catalog.scan()
+
+    results = catalog.search(pattern)
+    if not results:
+        click.echo(f"No models matching '{pattern}'.")
+        return
+
+    click.echo(f"\nModels matching '{pattern}' ({len(results)}):")
+    click.echo("-" * 80)
+    click.echo(f"  {'Name':<35s} {'Arch':<12s} {'Size (GB)':>10s} {'Quant':<10s}")
+    click.echo("-" * 80)
+    for m in results:
+        click.echo(
+            f"  {m.name:<35s} {m.architecture:<12s} {m.file_size_gb:>10.2f} {m.quantization:<10s}"
+        )
+    click.echo()
+
+
+@models_cmd.command("info")
+@click.argument("path_or_name")
+def models_info(path_or_name):
+    """Show details of a specific model."""
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    info = catalog.get_model(path_or_name)
+
+    if not info:
+        click.echo(f"Model not found: {path_or_name}")
+        return
+
+    click.echo(f"\nModel: {info.name}")
+    click.echo("=" * 50)
+    click.echo(f"  Path:           {info.path}")
+    click.echo(f"  Architecture:   {info.architecture}")
+    click.echo(f"  Context Length: {info.context_length}")
+    click.echo(f"  Quantization:   {info.quantization}")
+    click.echo(f"  Quant Version:  {info.quantization_version}")
+    click.echo(f"  File Size:      {info.file_size_gb:.2f} GB")
+    click.echo()
+
+
+@models_cmd.command("add")
+@click.argument("path")
+@click.option("--scan/--no-scan", default=True, help="Auto-scan after adding")
+def models_add(path, scan):
+    """Add a model to the catalog."""
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    model_path = Path(path)
+
+    if not model_path.exists():
+        click.echo(f"File not found: {model_path}")
+        return
+
+    info = catalog.add_model(model_path)
+    click.echo(f"✅ Added: {info.name}")
+    click.echo(f"   Path: {info.path}")
+    click.echo(f"   Arch: {info.architecture}")
+
+    if scan:
+        catalog.scan()
+        click.echo("✅ Catalog scanned.")
+
+
+@models_cmd.command("remove")
+@click.argument("name")
+def models_remove(name):
+    """Remove a model from the catalog (keeps the file)."""
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    if catalog.remove_model(name):
+        click.echo(f"✅ Removed: {name}")
+    else:
+        click.echo(f"Model not found: {name}")
+
+
+@models_cmd.command("recommend")
+@click.argument("path_or_name")
+def models_recommend(path_or_name):
+    """Show recommended settings for a model."""
+    from fairbench.hardware import detect_hardware, generate_recommendation
+    from fairbench.models import ModelCatalog
+
+    catalog = ModelCatalog()
+    info = catalog.get_model(path_or_name)
+
+    if info:
+        model_size_gb = info.file_size_gb
+        model_path = str(info.path)
+    else:
+        # Try as file path
+        model_path = path_or_name
+        model_size_gb = None
+        for pattern in (r"(\d+\.?\d*)\s*b",):
+            match = re.search(pattern, os.path.basename(model_path).lower())
+            if match:
+                model_size_gb = float(match.group(1))
+                break
+
+    if model_size_gb is None:
+        click.echo("  ℹ️  Cannot determine model size.")
+        return
+
+    hw = detect_hardware()
+    recommendations = generate_recommendation(hw, model_size_gb)
+
+    click.echo(f"\nRecommendations for {path_or_name} ({model_size_gb:.1f} GB):")
+    click.echo("=" * 50)
+    click.echo(f"  n_gpu_layers: {recommendations['gpu_layers']}")
+    click.echo(f"  quantization: {recommendations['quant']}")
+    click.echo(f"  n_ctx:        {recommendations['n_ctx']}")
+    click.echo(f"  threads:      {recommendations['threads']}")
+    click.echo()
 
 
 @cli.command("compare")
