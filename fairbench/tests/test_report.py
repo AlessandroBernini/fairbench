@@ -10,7 +10,6 @@ import pytest
 
 from fairbench.report import ReportEngine
 
-
 # --- Fixtures ---
 
 def _create_test_run(tmp_path: Path) -> Path:

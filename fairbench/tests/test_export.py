@@ -12,7 +12,6 @@ import pytest
 
 from fairbench.export import ExportEngine
 
-
 # --- Fixtures ---
 
 def _create_test_results(tmp_path: Path) -> Path:
