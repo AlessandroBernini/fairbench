@@ -6,8 +6,6 @@ import json
 import webbrowser
 from pathlib import Path
 
-from fairbench.compare import ComparisonEngine
-
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
