@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 import re
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-from collections.abc import Callable
 
 from fairbench.config import load_config
 
