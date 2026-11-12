@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import webbrowser
 from pathlib import Path
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
