@@ -7,7 +7,9 @@ import re
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+from collections.abc import Callable
 
 from fairbench.config import load_config
 
@@ -210,12 +212,11 @@ class ComparisonEngine:
 
             # Filter by model name patterns
             model_name = data.get("model_name", "")
-            if models:
-                if not any(
-                    re.match(pattern.replace("*", ".*"), model_name, re.IGNORECASE)
-                    for pattern in models
-                ):
-                    continue
+            if models and not any(
+                re.match(pattern.replace("*", ".*"), model_name, re.IGNORECASE)
+                for pattern in models
+            ):
+                continue
 
             # Filter by category
             if categories:
