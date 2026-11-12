@@ -270,7 +270,7 @@ def cmd_init():
         print(f"     n_gpu_layers: {adaptive['default_n_gpu_layers']}")
         print(f"     threads:      {adaptive['default_threads']}")
         print(f"     quant:        {adaptive['default_quant']}")
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError) as e:
         print(f"  ⚠️  Could not analyze hardware ({e}).")
         print()
     

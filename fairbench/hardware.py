@@ -52,7 +52,7 @@ def _detect_cpu() -> tuple[str, int, int]:
                 # Try lscpu
                 try:
                     result = subprocess.run(
-                        ["lscpu"], capture_output=True, text=True, timeout=5
+                        ["lscpu"], capture_output=True, text=True, timeout=5, check=False
                     )
                     for line in result.stdout.splitlines():
                         if "Model name:" in line:
@@ -67,6 +67,7 @@ def _detect_cpu() -> tuple[str, int, int]:
                     capture_output=True,
                     text=True,
                     timeout=5,
+                    check=False,
                 )
                 cpu_model = result.stdout.strip() or "Apple CPU"
             except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -84,7 +85,7 @@ def _detect_cpu() -> tuple[str, int, int]:
     try:
         cpu_threads = os.cpu_count() or 0
         cpu_cores = cpu_threads  # Assume same for fallback
-    except Exception:
+    except (AttributeError, OSError):
         pass
 
     return cpu_model, cpu_cores, cpu_threads
@@ -117,6 +118,7 @@ def _detect_ram() -> float:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             bytes_val = int(result.stdout.strip())
             return round(bytes_val / (1024**3), 2)
@@ -146,6 +148,7 @@ def _detect_gpu_nvidia() -> tuple[bool, str | None, float]:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
             if result.returncode == 0 and result.stdout.strip():
                 lines = result.stdout.strip().splitlines()
@@ -174,6 +177,7 @@ def _detect_gpu_apple() -> tuple[bool, str, float]:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         if result.returncode == 0:
             output = result.stdout
