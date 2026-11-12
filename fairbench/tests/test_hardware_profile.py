@@ -3,19 +3,12 @@
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from fairbench.hardware_profile import (
     HardwareSnapshot,
-    clear_hardware_cache,
-    get_cached_hardware_snapshot,
-    get_hardware_profile,
     get_hw_profile_info,
-    save_hardware_snapshot,
 )
 
 

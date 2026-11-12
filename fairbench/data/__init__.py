@@ -95,7 +95,7 @@ class DataManager:
             )
             meta_hash = hashlib.md5(meta_str.encode()).hexdigest()
             return (file_hash, meta_hash)
-        except Exception:
+        except (OSError, ValueError):
             return (file_hash, "")
 
     def get_cached_result(self, model_hash: str, benchmark: str) -> Any:

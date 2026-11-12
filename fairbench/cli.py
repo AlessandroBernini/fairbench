@@ -267,10 +267,7 @@ def run(
 @cli.command("hw-profile")
 def hw_profile_cmd():
     """Show current hardware profile and cache status."""
-    from fairbench.hardware_profile import (
-        clear_hardware_cache,
-        get_hw_profile_info,
-    )
+    from fairbench.hardware_profile import get_hw_profile_info
 
     info = get_hw_profile_info()
 
