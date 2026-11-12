@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import mmap
 import struct
 from pathlib import Path
 from typing import Any
-
 
 # GGUF magic bytes
 GGUF_MAGIC = b"GGUF"
@@ -100,7 +98,7 @@ def _parse_gguf_header(path: Path) -> dict[str, Any]:
             tensor_count_data = f.read(8)
             if len(tensor_count_data) < 8:
                 return info
-            tensor_count = struct.unpack("<Q", tensor_count_data)[0]
+            struct.unpack("<Q", tensor_count_data)[0]
 
             # Read KV count (uint64)
             kv_count_data = f.read(8)
