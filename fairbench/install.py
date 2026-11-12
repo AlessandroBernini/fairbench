@@ -245,20 +245,63 @@ def cmd_init():
         default=True,
     )
     
+    # Hardware-aware suggestions (before prompts, so adaptive values become defaults)
+    print()
+    print("🔍 Analyzing hardware for recommendations...")
+    adaptive = None
+    hw = None
+    try:
+        from fairbench.hardware import detect_hardware, generate_adaptive_config
+
+        hw = detect_hardware()
+        adaptive = generate_adaptive_config(hw)
+        
+        print()
+        print("  Detected hardware:")
+        print(f"    CPU: {hw.cpu_model} ({hw.cpu_cores} cores, {hw.cpu_threads} threads)")
+        print(f"    RAM: {hw.total_ram_gb:.1f} GB")
+        if hw.gpu_available:
+            print(f"    GPU: {hw.gpu_type} ({hw.gpu_vram_gb:.1f} GB VRAM)")
+        else:
+            print("    GPU: None detected")
+        print()
+        print("  💡 Recommended settings (based on your hardware):")
+        print(f"     n_ctx:        {adaptive['default_n_ctx']}")
+        print(f"     n_gpu_layers: {adaptive['default_n_gpu_layers']}")
+        print(f"     threads:      {adaptive['default_threads']}")
+        print(f"     quant:        {adaptive['default_quant']}")
+    except (ImportError, OSError, RuntimeError) as e:
+        print(f"  ⚠️  Could not analyze hardware ({e}).")
+        print()
+    
+    # GPU layers default from adaptive config
+    default_gpu_layers = adaptive["default_n_gpu_layers"] if adaptive else -1
+    
     # Ask for GPU layers
     gpu_layers = click.prompt(
         "🎮 Default GPU layers",
         type=int,
-        default=-1,
+        default=default_gpu_layers,
         show_default=True,
     )
+    
+    # Quantization default from adaptive config
+    default_quant = adaptive["default_quant"] if adaptive else "q4_k_m"
     
     # Ask for quantization
     quant = click.prompt(
         "📦 Default quantization",
-        default="q4_k_m",
+        default=default_quant,
         show_default=True,
     )
+    
+    # Confirm adaptive defaults if used
+    if adaptive and gpu_layers == adaptive["default_n_gpu_layers"] and quant == adaptive["default_quant"]:
+        confirm_adaptive = click.confirm("  ✅ Use these recommended values?")
+        if not confirm_adaptive:
+            print("  ⚠️  Using your customized values above.")
+        else:
+            print("  ✅ Using adaptive defaults")
     
     print()
 

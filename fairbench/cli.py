@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 from importlib import metadata
 
 import click
@@ -463,6 +465,118 @@ def init_cmd(ctx):
     save_config(config)
     click.echo(f"✅ Config created at {CONFIG_PATH}")
     click.echo("   Edit it with: fairbench config --set key=value")
+
+
+@cli.command("profile")
+def profile_cmd():
+    """Show detected hardware and recommended settings."""
+    from fairbench.hardware import detect_hardware, generate_adaptive_config
+
+    hw = detect_hardware()
+    adaptive = generate_adaptive_config(hw)
+
+    click.echo("\n🔍 Hardware Profile")
+    click.echo("=" * 50)
+    click.echo(f"  OS:           {hw.os_platform}")
+    click.echo(f"  CPU:          {hw.cpu_model}")
+    click.echo(f"  Cores:        {hw.cpu_cores}")
+    click.echo(f"  Threads:      {hw.cpu_threads}")
+    click.echo(f"  RAM:          {hw.total_ram_gb:.1f} GB")
+    click.echo(f"  GPU:          {'Yes' if hw.gpu_available else 'No'}")
+    if hw.gpu_available:
+        click.echo(f"    Type:       {hw.gpu_type}")
+        click.echo(f"    VRAM:       {hw.gpu_vram_gb:.1f} GB")
+    click.echo()
+    click.echo("💡 Recommended Settings")
+    click.echo("-" * 50)
+    click.echo(f"  n_ctx:        {adaptive['default_n_ctx']}")
+    click.echo(f"  n_gpu_layers: {adaptive['default_n_gpu_layers']}")
+    click.echo(f"  threads:      {adaptive['default_threads']}")
+    click.echo(f"  quant:        {adaptive['default_quant']}")
+    click.echo()
+
+
+@cli.command("recommend")
+@click.argument("model_path", required=False, default=None)
+@click.option(
+    "--model-size",
+    "-s",
+    "model_size_gb",
+    type=float,
+    default=None,
+    help="Model size in GB (auto-detected from filename if possible)",
+)
+@click.pass_context
+def recommend_cmd(ctx, model_path, model_size_gb):
+    """Show optimal config recommendations for a model.
+
+    MODEL_PATH is the path to the GGUF model file (optional — can also use --model-size).
+
+    Examples:
+    \\b
+    fairbench recommend ~/models/qwen2.5-7b.gguf
+    fairbench recommend --model-size 4.0
+    """
+    from fairbench.hardware import detect_hardware, generate_recommendation
+
+    hw = detect_hardware()
+
+    # Auto-detect model size from filename if not provided
+    if model_size_gb is None and model_path:
+        model_size_gb = _estimate_model_size(model_path)
+
+    if model_size_gb is None:
+        click.echo("  ℹ️  No model size provided. Use --model-size or pass a model path.")
+        click.echo(f"  ℹ️  Hardware detected: {hw.total_ram_gb:.1f} GB RAM, {hw.cpu_threads} threads")
+        click.echo()
+        click.echo("  💡 Run 'fairbench profile' to see hardware details.")
+        return
+
+    recommendations = generate_recommendation(hw, model_size_gb)
+
+    click.echo("\n📋 Recommendations")
+    click.echo("=" * 50)
+    click.echo(f"  Model size:   {model_size_gb:.1f} GB")
+    click.echo(f"  Available RAM: {hw.total_ram_gb:.1f} GB")
+    click.echo()
+
+    if recommendations.get("warning"):
+        click.echo(f"  ⚠️  {recommendations['warning']}")
+        click.echo()
+
+    click.echo("  Recommended settings:")
+    click.echo(f"    n_gpu_layers: {recommendations['gpu_layers']}")
+    click.echo(f"      → {recommendations['gpu_note']}")
+    click.echo()
+    click.echo(f"    quantization: {recommendations['quant']}")
+    click.echo(f"      → {recommendations['quant_note']}")
+    click.echo()
+    click.echo(f"    n_ctx:        {recommendations['n_ctx']}")
+    click.echo(f"      → {recommendations['n_ctx_note']}")
+    click.echo()
+    click.echo(f"    threads:      {recommendations['threads']}")
+    click.echo(f"      → {recommendations['threads_note']}")
+    click.echo()
+
+
+def _estimate_model_size(model_path: str) -> float | None:
+    """Estimate model size in GB from filename or file size."""
+    # Try to get actual file size
+    try:
+        size_bytes = os.path.getsize(model_path)
+        if size_bytes > 0:
+            return round(size_bytes / (1024**3), 2)
+    except (OSError, FileNotFoundError):
+        pass
+
+    # Try to parse from filename (e.g., "qwen2.5-7b" → 7 GB, "llama3-8b" → 8 GB)
+    basename = os.path.basename(model_path).lower()
+    # Match patterns like "7b", "8b", "13b", "70b", "1.5b", "3b"
+    match = re.search(r"(\d+\.?\d*)\s*b", basename)
+    if match:
+        return float(match.group(1))
+
+    return None
 
 
 if __name__ == "__main__":
