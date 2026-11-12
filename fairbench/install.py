@@ -260,6 +260,40 @@ def cmd_init():
         show_default=True,
     )
     
+    # Hardware-aware suggestions
+    print()
+    print("🔍 Analyzing hardware for recommendations...")
+    try:
+        from fairbench.hardware import detect_hardware, generate_adaptive_config
+
+        hw = detect_hardware()
+        adaptive = generate_adaptive_config(hw)
+        
+        print()
+        print("  Detected hardware:")
+        print(f"    CPU: {hw.cpu_model} ({hw.cpu_cores} cores, {hw.cpu_threads} threads)")
+        print(f"    RAM: {hw.total_ram_gb:.1f} GB")
+        if hw.gpu_available:
+            print(f"    GPU: {hw.gpu_type} ({hw.gpu_vram_gb:.1f} GB VRAM)")
+        else:
+            print("    GPU: None detected")
+        print()
+        print("  💡 Recommended settings (based on your hardware):")
+        print(f"     n_ctx:        {adaptive['default_n_ctx']}")
+        print(f"     n_gpu_layers: {adaptive['default_n_gpu_layers']}")
+        print(f"     threads:      {adaptive['default_threads']}")
+        print(f"     quant:        {adaptive['default_quant']}")
+        print()
+        
+        use_adaptive = click.confirm("  ✅ Use these recommended values?")
+        if use_adaptive:
+            gpu_layers = adaptive["default_n_gpu_layers"]
+            quant = adaptive["default_quant"]
+            print("  ✅ Using adaptive defaults")
+    except Exception as e:
+        print(f"  ⚠️  Could not analyze hardware ({e}). Using manual values.")
+        print()
+    
     print()
 
     # Create/update config
