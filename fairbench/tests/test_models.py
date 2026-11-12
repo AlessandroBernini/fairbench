@@ -9,7 +9,6 @@ import pytest
 
 from fairbench.models import ModelCatalog, ModelInfo, _parse_gguf_header
 
-
 # --- Fixtures ---
 
 def _create_mock_gguf(tmp_path: Path, name: str, arch: str = "llama") -> Path:
