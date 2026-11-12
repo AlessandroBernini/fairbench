@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import click
 
@@ -63,9 +62,9 @@ def _select_category() -> str | None:
 
 def _configure_parameters(
     model_path: str,
-) -> dict[str, object]:
+) -> dict[str, int | str | None]:
     """Guide user through parameter configuration."""
-    params: dict[str, object] = {}
+    params: dict[str, int | str | None] = {}
 
     # n_ctx
     n_ctx = click.prompt(
@@ -104,8 +103,8 @@ def _configure_parameters(
 
 def _review_and_confirm(
     model_path: str,
-    category: str,
-    params: dict[str, object],
+    category: str | None,
+    params: dict[str, int | str | None],
 ) -> bool:
     """Show summary and ask for confirmation."""
     click.echo("\n" + "=" * 60)
@@ -113,10 +112,13 @@ def _review_and_confirm(
     click.echo("=" * 60)
     click.echo(f"  Model:      {model_path}")
     click.echo(f"  Category:   {category}")
-    click.echo(f"  n_ctx:      {params.get('n_ctx')}")
-    click.echo(f"  n_gpu_layers: {params.get('n_gpu_layers')}")
-    click.echo(f"  n_threads:  {params.get('n_threads')}")
+    n_ctx = params.get("n_ctx")
+    n_gpu = params.get("n_gpu_layers")
+    n_threads = params.get("n_threads")
     quant = params.get("quantization")
+    click.echo(f"  n_ctx:      {n_ctx}")
+    click.echo(f"  n_gpu_layers: {n_gpu}")
+    click.echo(f"  n_threads:  {n_threads}")
     click.echo(f"  quantization: {quant if quant else 'default'}")
     click.echo("=" * 60)
 
@@ -155,41 +157,51 @@ def _run_interactive() -> None:
         "swebench": BenchmarkCategory.SWE_BENCH,
         "all": None,
     }
-    cat = cat_map.get(category)
+    cat = cat_map.get(category if category else "all")
+
+    # Extract parameters for type narrowing
+    n_ctx_val = params.get("n_ctx")
+    n_gpu_val = params.get("n_gpu_layers")
+    n_threads_val = params.get("n_threads")
+    quant_val = params.get("quantization")
+    n_ctx = int(n_ctx_val) if isinstance(n_ctx_val, int) else None
+    n_gpu = int(n_gpu_val) if isinstance(n_gpu_val, int) else None
+    n_threads = int(n_threads_val) if isinstance(n_threads_val, int) else None
+    quant = str(quant_val) if isinstance(quant_val, str) else None
 
     if category == "all":
         engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.QUALITY,
-            n_ctx=params.get("n_ctx"),
-            n_gpu_layers=params.get("n_gpu_layers"),
-            n_threads=params.get("n_threads"),
-            quantization=params.get("quantization"),
+            n_ctx=int(n_ctx) if n_ctx is not None else None,
+            n_gpu_layers=int(n_gpu) if n_gpu is not None else None,
+            n_threads=int(n_threads) if n_threads is not None else None,
+            quantization=quant,
         )
         engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.SPEED,
-            n_ctx=params.get("n_ctx"),
-            n_gpu_layers=params.get("n_gpu_layers"),
-            n_threads=params.get("n_threads"),
-            quantization=params.get("quantization"),
+            n_ctx=int(n_ctx) if n_ctx is not None else None,
+            n_gpu_layers=int(n_gpu) if n_gpu is not None else None,
+            n_threads=int(n_threads) if n_threads is not None else None,
+            quantization=quant,
         )
         engine.run_benchmark(
             model_path=model_path,
             category=BenchmarkCategory.MEMORY,
-            n_ctx=params.get("n_ctx"),
-            n_gpu_layers=params.get("n_gpu_layers"),
-            n_threads=params.get("n_threads"),
-            quantization=params.get("quantization"),
+            n_ctx=int(n_ctx) if n_ctx is not None else None,
+            n_gpu_layers=int(n_gpu) if n_gpu is not None else None,
+            n_threads=int(n_threads) if n_threads is not None else None,
+            quantization=quant,
         )
     elif cat:
         engine.run_benchmark(
             model_path=model_path,
             category=cat,
-            n_ctx=params.get("n_ctx"),
-            n_gpu_layers=params.get("n_gpu_layers"),
-            n_threads=params.get("n_threads"),
-            quantization=params.get("quantization"),
+            n_ctx=int(n_ctx) if n_ctx is not None else None,
+            n_gpu_layers=int(n_gpu) if n_gpu is not None else None,
+            n_threads=int(n_threads) if n_threads is not None else None,
+            quantization=quant,
         )
     else:
         click.echo("❌ Invalid category selected.")
@@ -207,5 +219,5 @@ def interactive_cmd() -> None:
         _run_interactive()
     except KeyboardInterrupt:
         click.echo("\n\n⚠️  Interrupted by user.")
-    except Exception as exc:
+    except RuntimeError as exc:
         click.echo(f"\n❌ Error: {exc}")

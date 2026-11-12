@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from fairbench.interactive import _configure_parameters, _review_and_confirm, _select_category, _select_model
+from fairbench.interactive import (
+    _configure_parameters,
+    _review_and_confirm,
+    _select_category,
+    _select_model,
+)
 from fairbench.models import ModelCatalog
 
 
