@@ -272,7 +272,7 @@ def generate_adaptive_config(hw: HardwareProfile) -> dict[str, object]:
     - default_threads: int
     - default_quant: str
     """
-    config = {}
+    config: dict[str, object] = {}
 
     # Context window — scale with RAM (512 MB per 1024 context units)
     # Range: 4096 to 8192
@@ -312,7 +312,7 @@ def generate_recommendation(
     Returns:
         Dict with recommendations and explanations
     """
-    recommendations = {}
+    recommendations: dict[str, object] = {}
 
     # Check if model fits in RAM
     if hw.total_ram_gb > 0 and model_size_gb > 0:
