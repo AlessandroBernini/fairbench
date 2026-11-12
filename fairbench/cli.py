@@ -35,6 +35,7 @@ def cli(ctx, config_path):
       fairbench download      Download a GGUF model from HuggingFace
       fairbench verify        Check system readiness
       fairbench run MODEL     Benchmark a GGUF model
+      fairbench interactive   Guided interactive benchmark
       fairbench show-paths    Show config & results locations
       fairbench quick-start   Demo with available benchmarks
       fairbench list-benchmarks  List available quality benchmarks
@@ -939,6 +940,11 @@ def _estimate_model_size(model_path: str) -> float | None:
         return float(match.group(1))
 
     return None
+
+
+from fairbench.interactive import interactive_cmd
+
+cli.add_command(interactive_cmd)
 
 
 if __name__ == "__main__":
