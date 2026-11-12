@@ -447,6 +447,75 @@ def results_cmd(ctx, category):
         click.echo(f"  {r}")
 
 
+@cli.command("compare")
+@click.option(
+    "--runs",
+    "-r",
+    "run_ids",
+    multiple=True,
+    help="Specific run IDs to compare (-r shorthand)",
+)
+@click.option(
+    "--model",
+    "-m",
+    "models",
+    multiple=True,
+    help="Model name patterns to filter (-m shorthand)",
+)
+@click.option(
+    "--category",
+    "-c",
+    "categories",
+    multiple=True,
+    help="Benchmark categories to include (-c shorthand)",
+)
+@click.option(
+    "--format",
+    "-f",
+    "fmt",
+    type=click.Choice(["console", "json", "csv"]),
+    default="console",
+    help="Output format (-f shorthand)",
+)
+@click.option(
+    "--sort-by",
+    "-s",
+    "sort_by",
+    default=None,
+    help="Sort models by benchmark score (-s shorthand)",
+)
+@click.pass_context
+def compare_cmd(ctx, run_ids, models, categories, fmt, sort_by):
+    """Compare benchmark results across models and configurations.
+
+    Compares local results to answer "which model is better on my hardware?".
+
+    Examples:
+    \b
+    fairbench compare                          # Compare all recent results
+    fairbench compare --runs run_123 run_456  # Compare specific runs
+    fairbench compare --model "qwen*"         # Compare by model pattern
+    fairbench compare --category quality       # Only quality benchmarks
+    fairbench compare --format json            # Output as JSON
+    fairbench compare --format csv > results.csv
+    """
+    from fairbench.compare import ComparisonEngine
+
+    engine = ComparisonEngine()
+    result = engine.compare_runs(
+        run_ids=list(run_ids) or None,
+        models=list(models) or None,
+        categories=list(categories) or None,
+    )
+
+    if fmt == "json":
+        click.echo(result.to_json())
+    elif fmt == "csv":
+        click.echo(result.to_csv())
+    else:
+        click.echo(result.to_console_table(sort_by=sort_by))
+
+
 @cli.command("init")
 @click.pass_context
 def init_cmd(ctx):
