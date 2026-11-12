@@ -288,6 +288,78 @@ def hw_profile_cmd():
     click.echo()
 
 
+@cli.command("validate-config")
+def validate_config_cmd():
+    """Validate current configuration file."""
+    import yaml as _yaml
+
+    from fairbench.config import (
+        CONFIG_PATH,
+        ConfigValidationError,
+        validate_config,
+    )
+
+    if not CONFIG_PATH.exists():
+        click.echo("✅ No config file found. Defaults will be used.")
+        return
+
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            data = _yaml.safe_load(f) or {}
+        validate_config(data)
+        click.echo(f"✅ Config is valid: {CONFIG_PATH}")
+    except ConfigValidationError as exc:
+        click.echo(f"❌ Config error: {exc}")
+        raise SystemExit(1)
+
+
+@cli.command("fix-config")
+def fix_config_cmd():
+    """Auto-fix common configuration issues."""
+    import yaml as _yaml
+
+    from fairbench.config import (
+        CONFIG_PATH,
+        VALID_CONFIG_KEYS,
+        ConfigValidationError,
+        _coerce_bool,
+        validate_config,
+    )
+    from fairbench.config import save_config as _save_config
+    from fairbench.types import BenchmarkConfig
+
+    if not CONFIG_PATH.exists():
+        click.echo("No config file found. Nothing to fix.")
+        return
+
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            data = _yaml.safe_load(f) or {}
+
+        # Coerce publish from string to bool
+        if isinstance(data.get("publish"), str):
+            data["publish"] = _coerce_bool(data["publish"])
+
+        # Remove unknown keys
+        unknown = set(data.keys()) - VALID_CONFIG_KEYS
+        if unknown:
+            click.echo(f"Removing unknown keys: {sorted(unknown)}")
+            for key in unknown:
+                data.pop(key)
+
+        # Re-validate
+        validate_config(data)
+
+        # Save fixed config
+        config = BenchmarkConfig(**data)  # type: ignore[arg-type]
+        _save_config(config)
+        click.echo(f"✅ Config fixed and saved: {CONFIG_PATH}")
+
+    except ConfigValidationError as exc:
+        click.echo(f"❌ Fix failed: {exc}")
+        raise SystemExit(1)
+
+
 @cli.command("list-benchmarks")
 @click.pass_context
 def list_benchmarks(ctx):
@@ -408,6 +480,8 @@ def config_cmd(ctx, show, set_kv):
         return
 
     if set_kv:
+        from fairbench.config import VALID_CONFIG_KEYS, _coerce_bool
+
         for kv in set_kv:
             if "=" not in kv:
                 click.echo(f"Invalid key=value: {kv}")
@@ -416,9 +490,21 @@ def config_cmd(ctx, show, set_kv):
             key = key.strip()
             value = value.strip()
 
+            if key not in VALID_CONFIG_KEYS:
+                click.echo(f"Unknown config key '{key}'. Valid keys:")
+                for valid_key in sorted(VALID_CONFIG_KEYS):
+                    click.echo(f"  {valid_key}")
+                continue
+
             # Parse value types
-            if value.lower() in ("true", "false"):
-                value = value.lower() == "true"
+            if key == "publish":
+                value = _coerce_bool(value)
+            elif key in ("default_n_ctx", "default_n_gpu_layers", "default_threads", "swebench_instances"):
+                try:
+                    value = int(value)
+                except ValueError:
+                    click.echo(f"{key}: must be an integer")
+                    continue
             else:
                 try:
                     value = int(value)
@@ -841,7 +927,11 @@ def init_cmd(ctx):
 
     Creates ~/.fairbench/config.yaml with sensible defaults if it doesn't already exist.
     """
-    from fairbench.config import CONFIG_PATH, _default_config, save_config
+    from fairbench.config import (
+        CONFIG_PATH,
+        _default_config,
+        save_config,
+    )
 
     if CONFIG_PATH.exists():
         click.echo(f"⚠️  Config already exists at {CONFIG_PATH}")
