@@ -8,7 +8,6 @@ import platform
 import re
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -20,7 +19,7 @@ class HardwareProfile:
     cpu_threads: int = 0
     total_ram_gb: float = 0.0
     gpu_available: bool = False
-    gpu_type: Optional[str] = None  # "nvidia", "apple-silicon", "amd", None
+    gpu_type: str | None  # "nvidia", "apple-silicon", "amd", None
     gpu_vram_gb: float = 0.0
     os_platform: str = "linux"  # "linux", "darwin", "windows"
 

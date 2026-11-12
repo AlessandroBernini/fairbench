@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 from importlib import metadata
 
 import click
