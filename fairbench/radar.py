@@ -77,7 +77,7 @@ class RadarEngine:
             angles = np.linspace(0, 2 * np.pi, len(chart_data["labels"]), endpoint=False).tolist()
             angles += angles[:1]  # Close the loop
 
-            fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+            fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={"polar": True})
 
             for dataset in chart_data["datasets"]:
                 data = dataset["data"] + [dataset["data"][0]]
