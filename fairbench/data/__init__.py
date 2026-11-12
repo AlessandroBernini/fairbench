@@ -155,7 +155,8 @@ class DataManager:
             if ttl_days is None:
                 return True
             age_days = (time.time() - cached_at) / 86400
-            return age_days < ttl_days
+            valid = age_days < ttl_days
+            return bool(valid)
         except (json.JSONDecodeError, OSError, KeyError):
             return True
 
