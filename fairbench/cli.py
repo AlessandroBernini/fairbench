@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from importlib import metadata
@@ -445,6 +446,108 @@ def results_cmd(ctx, category):
     click.echo(f"\nLocal results ({len(results)}):")
     for r in results:
         click.echo(f"  {r}")
+
+
+@cli.command("radar")
+@click.argument("run_id")
+@click.option("--save", "-s", "save_path", default=None, help="Save chart to file (-s shorthand)")
+@click.pass_context
+def radar_cmd(ctx, run_id, save_path):
+    """Generate radar/spider chart for a benchmark run.
+
+    RUN_ID is the ID of the run to visualize.
+    """
+    from fairbench.radar import RadarEngine
+
+    engine = RadarEngine(results_dir=str(ctx.obj["config"].results_dir))
+    chart_data = engine.generate_radar(run_id)
+
+    if save_path:
+        engine.save_chart(chart_data, save_path)
+        click.echo(f"✅ Chart saved to {save_path}")
+    else:
+        click.echo("Radar chart data (JSON):")
+        click.echo(json.dumps(chart_data, indent=2))
+
+
+@cli.command("export")
+@click.option(
+    "--format",
+    "-f",
+    "fmt",
+    type=click.Choice(["csv", "json"]),
+    default="csv",
+    help="Export format (-f shorthand)",
+)
+@click.option(
+    "--runs",
+    "-r",
+    "run_ids",
+    multiple=True,
+    help="Specific run IDs to export (-r shorthand)",
+)
+@click.option(
+    "--category",
+    "-c",
+    "categories",
+    multiple=True,
+    help="Benchmark categories to include (-c shorthand)",
+)
+@click.option(
+    "--model",
+    "-m",
+    "models",
+    multiple=True,
+    help="Model name patterns to filter (-m shorthand)",
+)
+@click.pass_context
+def export_cmd(ctx, fmt, run_ids, categories, models):
+    """Export benchmark results to CSV or JSON.
+
+    Examples:
+    \\b
+    fairbench export --format csv > results.csv
+    fairbench export -k quality --format csv
+    fairbench export -r run_123 --format json
+    """
+    from fairbench.export import ExportEngine
+
+    engine = ExportEngine(results_dir=str(ctx.obj["config"].results_dir))
+
+    if fmt == "csv":
+        output = engine.export_csv(
+            run_ids=list(run_ids) or None,
+            categories=list(categories) or None,
+            models=list(models) or None,
+        )
+        click.echo(output)
+    elif fmt == "json":
+        output = engine.export_json(run_ids=list(run_ids) or None)
+        click.echo(output)
+
+
+@cli.command("report")
+@click.argument("run_id")
+@click.option("--open", "-o", "open_browser", is_flag=True, help="Open report in browser (-o shorthand)")
+@click.pass_context
+def report_cmd(ctx, run_id, open_browser):
+    """Generate HTML report for a benchmark run.
+
+    RUN_ID is the ID of the run to report on.
+
+    Examples:
+    \\b
+    fairbench report run_123
+    fairbench report run_123 --open
+    """
+    from fairbench.report import ReportEngine
+
+    engine = ReportEngine(results_dir=str(ctx.obj["config"].results_dir))
+    report_path = engine.save_report(run_id, open_browser=open_browser)
+
+    click.echo(f"✅ Report generated: {report_path}")
+    if not open_browser:
+        click.echo("   Open it with: fairbench report run_123 --open")
 
 
 @cli.command("compare")
