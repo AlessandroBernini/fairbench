@@ -157,7 +157,7 @@ def _run_interactive() -> None:
         "swebench": BenchmarkCategory.SWE_BENCH,
         "all": None,
     }
-    cat = cat_map.get(category)
+    cat = cat_map.get(category if category else "all")
 
     # Extract parameters for type narrowing
     n_ctx_val = params.get("n_ctx")
