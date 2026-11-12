@@ -583,7 +583,7 @@ def models_cmd():
     fairbench models add ~/my-model.gguf
     fairbench models remove qwen2.5-7b
     """
-    pass
+    ...
 
 
 @models_cmd.command("list")
@@ -669,6 +669,7 @@ def models_info(path_or_name):
 def models_add(path, scan):
     """Add a model to the catalog."""
     from fairbench.models import ModelCatalog
+    from pathlib import Path
 
     catalog = ModelCatalog()
     model_path = Path(path)
