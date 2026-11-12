@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from fairbench.compare import ComparisonEngine, ComparisonResult
+from fairbench.compare import ComparisonEngine
 
 
 # --- Fixtures ---
@@ -187,7 +187,6 @@ class TestAggregate:
         result = engine.compare_runs()
 
         # qwen2.5-7b-q4_k_m has mmlu=68.2, qwen2.5-7b-q6_k has mmlu=70.5
-        qwen_mmlu = [s for m in result.models if "qwen2.5-7b-q4" in m for s in result.benchmarks.get("mmlu", [])]
         assert 68.2 in result.benchmarks["mmlu"]
         assert 70.5 in result.benchmarks["mmlu"]
 
