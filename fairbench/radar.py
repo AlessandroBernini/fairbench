@@ -68,13 +68,17 @@ class RadarEngine:
         Falls back to ASCII art if matplotlib is not available.
         """
         try:
+            import math
+
             import matplotlib
             matplotlib.use("Agg")  # Non-interactive backend
             import matplotlib.pyplot as plt
-            import numpy as np
 
-            angles = np.linspace(0, 2 * np.pi, len(chart_data["labels"]), endpoint=False).tolist()
-            angles += angles[:1]  # Close the loop
+            n_angles: int = len(chart_data["labels"])
+            angles_list: list[float] = [
+                float(2 * math.pi * i / n_angles) for i in range(n_angles)
+            ]
+            angles = angles_list + angles_list[:1]  # Close the loop
 
             fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={"polar": True})
 
