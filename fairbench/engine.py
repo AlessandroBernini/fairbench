@@ -150,6 +150,13 @@ class BenchmarkEngine:
             ],
         }
 
+        # Attach hardware profile to result
+        from fairbench.hardware_profile import get_hardware_profile
+
+        hw_profile = get_hardware_profile()
+        result_dict["hardware_profile_hash"] = hw_profile.profile_hash
+        result_dict["hardware_snapshot"] = hw_profile.to_dict()
+
         saved_path = self.data.save_result(run_id, result_dict)
         print(f"\nResult saved to: {saved_path}")
 

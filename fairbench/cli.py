@@ -264,6 +264,30 @@ def run(
     )
 
 
+@cli.command("hw-profile")
+def hw_profile_cmd():
+    """Show current hardware profile and cache status."""
+    from fairbench.hardware_profile import get_hw_profile_info
+
+    info = get_hw_profile_info()
+
+    click.echo("\n🔍 Hardware Profile")
+    click.echo("=" * 50)
+    click.echo(f"  Profile Hash: {info['profile_hash']}")
+    click.echo(f"  CPU:          {info['cpu_model']}")
+    click.echo(f"  Cores:        {info['cpu_cores']}")
+    click.echo(f"  Threads:      {info['cpu_threads']}")
+    click.echo(f"  RAM:          {info['total_ram_gb']} GB")
+    click.echo(f"  GPU:          {'Yes' if info['gpu_available'] else 'No'}")
+    if info["gpu_available"]:
+        click.echo(f"    Type:       {info['gpu_type']}")
+        click.echo(f"    VRAM:       {info['gpu_vram_gb']} GB")
+    click.echo(f"  OS:           {info['os_platform']} {info['os_version']}")
+    click.echo(f"  Kernel:       {info['kernel_version']}")
+    click.echo(f"  Cached:       {'Yes' if info['cached'] else 'No'}")
+    click.echo()
+
+
 @cli.command("list-benchmarks")
 @click.pass_context
 def list_benchmarks(ctx):
