@@ -213,5 +213,103 @@ class TestDetectHardwareIntegration(unittest.TestCase):
         self.assertEqual(hw.gpu_vram_gb, 12.0)
 
 
+class TestGPUDetectionEdgeCases(unittest.TestCase):
+    """Test individual GPU detection edge cases."""
+
+    @patch("fairbench.hardware.subprocess.run")
+    def test_nvidia_permission_error(self, mock_run):
+        """Test nvidia-smi PermissionError is caught gracefully."""
+        mock_run.side_effect = PermissionError("Permission denied")
+        from fairbench.hardware import _detect_gpu_nvidia
+
+        result = _detect_gpu_nvidia()
+        self.assertFalse(result[0])
+        self.assertIsNone(result[1])
+
+    @patch("fairbench.hardware.subprocess.run")
+    def test_apple_permission_error(self, mock_run):
+        """Test system_profiler PermissionError is caught gracefully."""
+        mock_run.side_effect = PermissionError("Permission denied")
+        from unittest.mock import patch as mock_patch
+
+        with mock_patch("platform.system", return_value="Darwin"):
+            from fairbench.hardware import _detect_gpu_apple
+
+            result = _detect_gpu_apple()
+            self.assertFalse(result[0])
+            self.assertIsNone(result[1])
+
+    @patch("fairbench.hardware.subprocess.run")
+    def test_nvidia_parse_error(self, mock_run):
+        """Test nvidia-smi with unparseable output."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="bad,output\n")
+        from fairbench.hardware import _detect_gpu_nvidia
+
+        result = _detect_gpu_nvidia()
+        # Should gracefully handle parse error and return no GPU
+        self.assertFalse(result[0])
+
+    @patch("fairbench.hardware.subprocess.run")
+    def test_nvidia_single_gpu(self, mock_run):
+        """Test nvidia-smi with single GPU."""
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="NVIDIA RTX 4090, 24576\n"
+        )
+        from fairbench.hardware import _detect_gpu_nvidia
+
+        result = _detect_gpu_nvidia()
+        self.assertTrue(result[0])
+        self.assertEqual(result[1], "nvidia")
+        self.assertEqual(result[2], 24.0)
+
+    def test_amd_gpu_detection(self):
+        """Test AMD GPU detection logic (direct unit test)."""
+        from unittest.mock import patch as mock_patch
+        
+        with mock_patch("platform.system", return_value="Linux"), \
+             mock_patch("fairbench.hardware.glob.glob", return_value=[]):
+            from fairbench.hardware import _detect_gpu_amd
+            result = _detect_gpu_amd()
+            self.assertFalse(result[0])
+
+    @patch("fairbench.hardware.glob.glob")
+    def test_amd_not_detected(self, mock_glob):
+        """Test AMD GPU not found."""
+        mock_glob.return_value = []
+        from unittest.mock import patch as mock_patch
+
+        with mock_patch("platform.system", return_value="Linux"):
+            from fairbench.hardware import _detect_gpu_amd
+
+            result = _detect_gpu_amd()
+            self.assertFalse(result[0])
+
+
+class TestEdgeCases(unittest.TestCase):
+    """Test edge cases for config generation."""
+
+    def test_zero_ram_system(self):
+        """Test config for zero RAM (should use minimums)."""
+        hw = HardwareProfile(total_ram_gb=0.0)
+        config = generate_adaptive_config(hw)
+        self.assertEqual(config["default_n_ctx"], 4096)  # min
+        self.assertEqual(config["default_threads"], 4)  # min
+        self.assertEqual(config["default_quant"], "q4_k_m")
+
+    def test_zero_cores_system(self):
+        """Test config for zero cores (should use minimums)."""
+        hw = HardwareProfile(cpu_threads=0, total_ram_gb=8.0)
+        config = generate_adaptive_config(hw)
+        self.assertEqual(config["default_threads"], 4)  # min 4
+
+    def test_recommendation_zero_ram(self):
+        """Test recommendation with zero RAM."""
+        hw = HardwareProfile(total_ram_gb=0.0)
+        recs = generate_recommendation(hw, model_size_gb=4.0)
+        # Should not crash, should give CPU-only recommendations
+        self.assertEqual(recs["gpu_layers"], 0)
+        self.assertEqual(recs["threads"], 4)  # min
+
+
 if __name__ == "__main__":
     unittest.main()

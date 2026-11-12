@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import glob
 import os
 import platform
+import re
 import subprocess
 from dataclasses import dataclass
 from typing import Optional
@@ -124,7 +126,7 @@ def _detect_ram() -> float:
     return 0.0
 
 
-def _detect_gpu_nvidia() -> tuple[bool, str, float]:
+def _detect_gpu_nvidia() -> tuple[bool, str | None, float]:
     """Detect NVIDIA GPU via nvidia-smi."""
     gpu_available = False
     gpu_type = None
@@ -150,12 +152,12 @@ def _detect_gpu_nvidia() -> tuple[bool, str, float]:
                 # Parse first GPU
                 parts = [line.strip() for line in lines[0].split(",")]
                 if len(parts) >= 2:
-                    gpu_type = "nvidia"
-                    gpu_name = parts[0]
-                    gpu_vram_gb = round(float(parts[1]) / 1024, 2)
-                    gpu_available = True
-                    return gpu_available, gpu_type, gpu_vram_gb
-        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
+                    try:
+                        gpu_vram_gb = round(float(parts[1]) / 1024, 2)
+                        return True, "nvidia", gpu_vram_gb
+                    except ValueError:
+                        continue
+        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, PermissionError):
             continue
 
     return gpu_available, gpu_type, gpu_vram_gb
@@ -181,8 +183,6 @@ def _detect_gpu_apple() -> tuple[bool, str, float]:
                 for line in output.splitlines():
                     if "VRAM" in line or "Display RAM" in line:
                         # e.g., "VRAM (Total): 16 GB"
-                        import re
-
                         match = re.search(r"([\d.]+)\s*(GB|MB)", line)
                         if match:
                             vram_val = float(match.group(1))
@@ -191,7 +191,7 @@ def _detect_gpu_apple() -> tuple[bool, str, float]:
                                 vram_val /= 1024
                             return True, "apple-silicon", vram_val
                 return True, "apple-silicon", 0.0  # Can't parse VRAM but GPU exists
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
         pass
 
     return False, None, 0.0
@@ -203,8 +203,6 @@ def _detect_gpu_amd() -> tuple[bool, str, float]:
         return False, None, 0.0
 
     try:
-        import glob
-
         vendor_files = glob.glob("/sys/class/drm/card*/device/vendor")
         for vf in vendor_files:
             with open(vf, "r") as f:

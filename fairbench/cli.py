@@ -559,22 +559,18 @@ def recommend_cmd(ctx, model_path, model_size_gb):
 
 def _estimate_model_size(model_path: str) -> float | None:
     """Estimate model size in GB from filename or file size."""
-    import os as _os
-
     # Try to get actual file size
     try:
-        size_bytes = _os.path.getsize(model_path)
+        size_bytes = os.path.getsize(model_path)
         if size_bytes > 0:
             return round(size_bytes / (1024**3), 2)
     except (OSError, FileNotFoundError):
         pass
 
     # Try to parse from filename (e.g., "qwen2.5-7b" → 7 GB, "llama3-8b" → 8 GB)
-    import re as _re
-
-    basename = _os.path.basename(model_path).lower()
+    basename = os.path.basename(model_path).lower()
     # Match patterns like "7b", "8b", "13b", "70b", "1.5b", "3b"
-    match = _re.search(r"(\d+\.?\d*)\s*b", basename)
+    match = re.search(r"(\d+\.?\d*)\s*b", basename)
     if match:
         return float(match.group(1))
 
