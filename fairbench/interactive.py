@@ -207,5 +207,5 @@ def interactive_cmd() -> None:
         _run_interactive()
     except KeyboardInterrupt:
         click.echo("\n\n⚠️  Interrupted by user.")
-    except Exception as exc:
+    except RuntimeError as exc:
         click.echo(f"\n❌ Error: {exc}")
