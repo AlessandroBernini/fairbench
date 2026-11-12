@@ -96,7 +96,7 @@ def _detect_ram() -> float:
         import psutil
 
         total_bytes = psutil.virtual_memory().total
-        return round(total_bytes / (1024**3), 2)
+        return round(float(total_bytes) / (1024**3), 2)
     except ImportError:
         pass
 
@@ -165,7 +165,7 @@ def _detect_gpu_nvidia() -> tuple[bool, str | None, float]:
     return gpu_available, gpu_type, gpu_vram_gb
 
 
-def _detect_gpu_apple() -> tuple[bool, str, float]:
+def _detect_gpu_apple() -> tuple[bool, str | None, float]:
     """Detect Apple Silicon GPU via system_profiler."""
     if platform.system() != "Darwin":
         return False, None, 0.0
@@ -200,7 +200,7 @@ def _detect_gpu_apple() -> tuple[bool, str, float]:
     return False, None, 0.0
 
 
-def _detect_gpu_amd() -> tuple[bool, str, float]:
+def _detect_gpu_amd() -> tuple[bool, str | None, float]:
     """Detect AMD GPU via /sys/class/drm."""
     if platform.system() != "Linux":
         return False, None, 0.0
@@ -263,7 +263,7 @@ def detect_hardware() -> HardwareProfile:
     )
 
 
-def generate_adaptive_config(hw: HardwareProfile) -> dict:
+def generate_adaptive_config(hw: HardwareProfile) -> dict[str, object]:
     """Generate adaptive config based on hardware profile.
 
     Returns a dict with keys matching config.yaml fields:
@@ -302,7 +302,7 @@ def generate_adaptive_config(hw: HardwareProfile) -> dict:
 
 def generate_recommendation(
     hw: HardwareProfile, model_size_gb: float
-) -> dict:
+) -> dict[str, object]:
     """Generate recommendations for a specific model size.
 
     Args:
