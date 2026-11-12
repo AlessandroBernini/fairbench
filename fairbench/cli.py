@@ -583,7 +583,6 @@ def models_cmd():
     fairbench models add ~/my-model.gguf
     fairbench models remove qwen2.5-7b
     """
-    ...
 
 
 @models_cmd.command("list")
@@ -668,8 +667,9 @@ def models_info(path_or_name):
 @click.option("--scan/--no-scan", default=True, help="Auto-scan after adding")
 def models_add(path, scan):
     """Add a model to the catalog."""
-    from fairbench.models import ModelCatalog
     from pathlib import Path
+
+    from fairbench.models import ModelCatalog
 
     catalog = ModelCatalog()
     model_path = Path(path)
