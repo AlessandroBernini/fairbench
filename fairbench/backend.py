@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import time
@@ -10,6 +11,8 @@ import psutil
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from fairbench.types import MemoryResult, SpeedResult
+
+logger = logging.getLogger("fairbench")
 
 
 def benchmark_speed(
@@ -93,7 +96,7 @@ def _benchmark_with_llama_cpp(
                 progress.update(task, completed=1)
             except (OSError, RuntimeError) as e:
                 progress.update(task, completed=1)
-                print(f"    Run {i + 1} failed: {e}")
+                logger.warning("Run %d failed: %s", i + 1, e)
 
     return SpeedResult(
         ttft_avg=sum(ttfts) / len(ttfts) if ttfts else 0.0,

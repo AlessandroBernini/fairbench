@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +19,8 @@ from fairbench.types import (
     BenchmarkRun,
     LiteMode,
 )
+
+logger = logging.getLogger("fairbench")
 
 
 class BenchmarkEngine:
@@ -60,20 +63,20 @@ class BenchmarkEngine:
         quantization = quantization or self.config.default_quant
         lite_mode_val = lite_mode or "auto"
 
-        print("\nFairBench v0.3.0")
-        print(f"Model: {model_path}")
-        print(f"Category: {category.value}")
-        print(f"Context: {n_ctx}, GPU Layers: {n_gpu_layers}, Threads: {n_threads}")
-        print(f"Quantization: {quantization}")
+        logger.info("FairBench v%s", "0.3.0")
+        logger.info("Model: %s", model_path)
+        logger.info("Category: %s", category.value)
+        logger.info("Context: %d | GPU Layers: %d | Threads: %d", n_ctx, n_gpu_layers, n_threads)
+        logger.info("Quantization: %s", quantization)
 
         # Verify model file exists
         if not Path(model_path).exists():
-            print(f"\n❌ Error: Model file not found: {model_path}")
-            print("\n  Possible fixes:")
-            print("  • Check the path is correct")
-            print("  • Use an absolute path (e.g., ~/models/model.gguf)")
-            print("  • Download a model first:")
-            print("    huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --include '*.gguf*' --local-dir ~/models/")
+            logger.error("Error: Model file not found: %s", model_path)
+            logger.info("Possible fixes:")
+            logger.info("  • Check the path is correct")
+            logger.info("  • Use an absolute path (e.g., ~/models/model.gguf)")
+            logger.info("  • Download a model first:")
+            logger.info("    huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --include '*.gguf*' --local-dir ~/models/")
             raise SystemExit(1)
 
         run = BenchmarkRun(
@@ -157,17 +160,17 @@ class BenchmarkEngine:
         result_dict["hardware_snapshot"] = hw_profile.to_dict()
 
         saved_path = self.data.save_result(run_id, result_dict)
-        print(f"\n✅ Final result saved to: {saved_path}")
+        logger.info("Final result saved to: %s", saved_path)
 
         # Publish if configured
         if self.config.publish:
             result = self.reporter.publish_result(run_id, result_dict)
             if result:
-                print("Result published to leaderboard")
+                logger.info("Result published to leaderboard")
             else:
-                print("⚠ Warning: Failed to publish result (API unavailable)")
+                logger.warning("Failed to publish result (API unavailable)")
         else:
-            print("Result not published (publish disabled in config)")
+            logger.info("Result not published (publish disabled in config)")
 
         return run
 
@@ -192,7 +195,7 @@ class BenchmarkEngine:
         lite_mode_enum = mode_map.get(lite_mode, LiteMode.AUTO)
 
         # Quality
-        print("\n[Quality Benchmark]")
+        logger.info("[Quality Benchmark]")
         try:
             quality_results = run_quality_benchmark(
                 model_path=model_path,
@@ -204,23 +207,27 @@ class BenchmarkEngine:
             run.quality_results = quality_results
 
             for result in quality_results:
-                print(
-                    f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})"
+                logger.info(
+                    "  %s: %.4f (%d/%d)",
+                    result.benchmark_name,
+                    result.score,
+                    result.items_correct,
+                    result.items_total,
                 )
 
             # Save partial results after quality
             self._save_partial_result(run_id, run, category="quality")
         except ImportError as e:
             if "lm_eval" in str(e).lower():
-                print("\n  ❌ lm-eval not installed")
-                print("  ℹ️  Quality benchmarks require lm-eval")
-                print("  💡 Install with:")
-                print("     pip install fairbench-ai[ml]")
+                logger.error("lm-eval not installed")
+                logger.info("Quality benchmarks require lm-eval")
+                logger.info("Install with:")
+                logger.info("   pip install fairbench-ai[ml]")
             else:
                 raise
 
         # Speed
-        print("\n[Speed Benchmark]")
+        logger.info("[Speed Benchmark]")
         try:
             speed_result = benchmark_speed(
                 model_path=model_path,
@@ -229,23 +236,23 @@ class BenchmarkEngine:
                 n_threads=n_threads,
             )
             run.speed_result = speed_result
-            print(f"  TTFT: {speed_result.ttft_avg:.2f}ms")
-            print(f"  TPOT: {speed_result.tpot_avg:.4f} tokens/s")
-            print(f"  Throughput: {speed_result.throughput_avg:.2f} tokens/s")
+            logger.info("  TTFT: %.2fms", speed_result.ttft_avg)
+            logger.info("  TPOT: %.4f tokens/s", speed_result.tpot_avg)
+            logger.info("  Throughput: %.2f tokens/s", speed_result.throughput_avg)
 
             # Save partial results after speed
             self._save_partial_result(run_id, run, category="speed")
         except ImportError as e:
             if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
-                print("\n  ❌ llama-cpp-python not installed")
-                print("  ℹ️  Speed/memory benchmarks require llama-cpp-python")
-                print("  💡 Install with:")
-                print("     pip install llama-cpp-python")
+                logger.error("llama-cpp-python not installed")
+                logger.info("Speed/memory benchmarks require llama-cpp-python")
+                logger.info("Install with:")
+                logger.info("   pip install llama-cpp-python")
             else:
                 raise
 
         # Memory
-        print("\n[Memory Benchmark]")
+        logger.info("[Memory Benchmark]")
         try:
             memory_result = benchmark_memory(
                 model_path=model_path,
@@ -254,17 +261,17 @@ class BenchmarkEngine:
                 n_threads=n_threads,
             )
             run.memory_result = memory_result
-            print(f"  VRAM Peak: {memory_result.vram_peak_mb:.0f} MB")
-            print(f"  RAM Peak: {memory_result.ram_peak_mb:.0f} MB")
+            logger.info("  VRAM Peak: %.0f MB", memory_result.vram_peak_mb)
+            logger.info("  RAM Peak: %.0f MB", memory_result.ram_peak_mb)
 
             # Save partial results after memory
             self._save_partial_result(run_id, run, category="memory")
         except ImportError as e:
             if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
-                print("\n  ❌ llama-cpp-python not installed")
-                print("  ℹ️  Speed/memory benchmarks require llama-cpp-python")
-                print("  💡 Install with:")
-                print("     pip install llama-cpp-python")
+                logger.error("llama-cpp-python not installed")
+                logger.info("Speed/memory benchmarks require llama-cpp-python")
+                logger.info("Install with:")
+                logger.info("   pip install llama-cpp-python")
             else:
                 raise
 
@@ -315,7 +322,7 @@ class BenchmarkEngine:
             else None,
         }
         self.data.save_result(run_id, result_dict)
-        print(f"  💾 Partial result saved for '{category}'")
+        logger.info("Partial result saved for '%s'", category)
 
     def _run_swebench(
         self,
@@ -326,7 +333,7 @@ class BenchmarkEngine:
         """Run SWE-bench evaluation."""
         split = "lite" if lite_mode == "enabled" else "full"
 
-        print("\n[SWE-bench Evaluation]")
+        logger.info("[SWE-bench Evaluation]")
         results = self.swebench_client.run_evaluation(
             model_path=model_path,
             split=split,
@@ -334,11 +341,11 @@ class BenchmarkEngine:
         run.swebench_results = results
 
         stats = self.swebench_client.compute_stats(results)
-        print(f"\n  Total: {stats.total_instances}")
-        print(f"  Resolved: {stats.resolved}")
-        print(f"  Failed: {stats.failed}")
-        print(f"  Errors: {stats.errors}")
-        print(f"  Score: {stats.avg_test_score:.1f}%")
+        logger.info("  Total: %d", stats.total_instances)
+        logger.info("  Resolved: %d", stats.resolved)
+        logger.info("  Failed: %d", stats.failed)
+        logger.info("  Errors: %d", stats.errors)
+        logger.info("  Score: %.1f%%", stats.avg_test_score)
 
         return run
 
