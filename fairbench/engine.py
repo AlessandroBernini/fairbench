@@ -88,20 +88,19 @@ class BenchmarkEngine:
         )
 
         # Run specified category
+        run_id = f"checkpoint_{int(time.time())}"
         if category in (
             BenchmarkCategory.QUALITY,
             BenchmarkCategory.SPEED,
             BenchmarkCategory.MEMORY,
         ):
             run = self._run_quality_speed_memory(
-                run, model_path, tasks, n_ctx, n_gpu_layers, n_threads, lite_mode_val
+                run, model_path, tasks, n_ctx, n_gpu_layers, n_threads, lite_mode_val, run_id
             )
 
         if category == BenchmarkCategory.SWE_BENCH:
             run = self._run_swebench(run, model_path, lite_mode_val)
 
-        # Save result
-        run_id = f"{run.model_name}_{int(time.time())}"
         result_dict = {
             "run_id": run_id,
             "model_name": run.model_name,
@@ -150,7 +149,7 @@ class BenchmarkEngine:
             ],
         }
 
-        # Attach hardware profile to result
+        # Attach hardware profile to final result
         from fairbench.hardware_profile import get_hardware_profile
 
         hw_profile = get_hardware_profile()
@@ -158,7 +157,7 @@ class BenchmarkEngine:
         result_dict["hardware_snapshot"] = hw_profile.to_dict()
 
         saved_path = self.data.save_result(run_id, result_dict)
-        print(f"\nResult saved to: {saved_path}")
+        print(f"\n✅ Final result saved to: {saved_path}")
 
         # Publish if configured
         if self.config.publish:
@@ -181,6 +180,7 @@ class BenchmarkEngine:
         n_gpu_layers: int,
         n_threads: int,
         lite_mode: str,
+        run_id: str,
     ) -> BenchmarkRun:
         """Run quality, speed, and memory benchmarks."""
         # Convert string to LiteMode enum
@@ -199,6 +199,7 @@ class BenchmarkEngine:
                 tasks=tasks,
                 lite_mode=lite_mode_enum,
                 config=self.config,
+                run_id=run_id,
             )
             run.quality_results = quality_results
 
@@ -206,6 +207,9 @@ class BenchmarkEngine:
                 print(
                     f"  {result.benchmark_name}: {result.score:.4f} ({result.items_correct}/{result.items_total})"
                 )
+
+            # Save partial results after quality
+            self._save_partial_result(run_id, run, category="quality")
         except ImportError as e:
             if "lm_eval" in str(e).lower():
                 print("\n  ❌ lm-eval not installed")
@@ -228,6 +232,9 @@ class BenchmarkEngine:
             print(f"  TTFT: {speed_result.ttft_avg:.2f}ms")
             print(f"  TPOT: {speed_result.tpot_avg:.4f} tokens/s")
             print(f"  Throughput: {speed_result.throughput_avg:.2f} tokens/s")
+
+            # Save partial results after speed
+            self._save_partial_result(run_id, run, category="speed")
         except ImportError as e:
             if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
                 print("\n  ❌ llama-cpp-python not installed")
@@ -249,6 +256,9 @@ class BenchmarkEngine:
             run.memory_result = memory_result
             print(f"  VRAM Peak: {memory_result.vram_peak_mb:.0f} MB")
             print(f"  RAM Peak: {memory_result.ram_peak_mb:.0f} MB")
+
+            # Save partial results after memory
+            self._save_partial_result(run_id, run, category="memory")
         except ImportError as e:
             if "llama_cpp" in str(e).lower() or "llama-cpp" in str(e).lower():
                 print("\n  ❌ llama-cpp-python not installed")
@@ -259,6 +269,53 @@ class BenchmarkEngine:
                 raise
 
         return run
+
+    def _save_partial_result(
+        self,
+        run_id: str,
+        run: BenchmarkRun,
+        category: str,
+    ) -> None:
+        """Save partial results for a category."""
+        result_dict = {
+            "run_id": run_id,
+            "model_name": run.model_name,
+            "model_path": run.model_path,
+            "quantization": run.quantization,
+            "n_ctx": run.n_ctx,
+            "n_gpu_layers": run.n_gpu_layers,
+            "n_threads": run.n_threads,
+            "timestamp": run.timestamp,
+            "category": category,
+            "quality_results": [
+                {
+                    "benchmark_name": r.benchmark_name,
+                    "score": r.score,
+                    "items_total": r.items_total,
+                    "items_correct": r.items_correct,
+                    "metadata": r.metadata,
+                }
+                for r in run.quality_results
+            ],
+            "speed_result": {
+                "ttft_avg": run.speed_result.ttft_avg if run.speed_result else 0,
+                "tpot_avg": run.speed_result.tpot_avg if run.speed_result else 0,
+                "throughput_avg": run.speed_result.throughput_avg if run.speed_result else 0,
+                "runs": run.speed_result.runs if run.speed_result else 0,
+                "metadata": run.speed_result.metadata if run.speed_result else {},
+            }
+            if run.speed_result
+            else None,
+            "memory_result": {
+                "vram_peak_mb": run.memory_result.vram_peak_mb if run.memory_result else 0,
+                "ram_peak_mb": run.memory_result.ram_peak_mb if run.memory_result else 0,
+                "metadata": run.memory_result.metadata if run.memory_result else {},
+            }
+            if run.memory_result
+            else None,
+        }
+        self.data.save_result(run_id, result_dict)
+        print(f"  💾 Partial result saved for '{category}'")
 
     def _run_swebench(
         self,
