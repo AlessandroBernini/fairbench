@@ -360,6 +360,39 @@ def fix_config_cmd():
         raise SystemExit(1)
 
 
+@cli.command("checkpoints")
+@click.option("--cleanup", is_flag=True, help="Remove checkpoints older than 24 hours.")
+def checkpoints_cmd(cleanup):
+    """List or manage benchmark checkpoints."""
+    from fairbench.checkpoint import cleanup_old_checkpoints, list_checkpoints
+
+    if cleanup:
+        removed = cleanup_old_checkpoints()
+        click.echo(f"🧹 Cleaned up {removed} old checkpoint(s).")
+        return
+
+    checkpoints = list_checkpoints()
+    if not checkpoints:
+        click.echo("No active checkpoints found.")
+        return
+
+    click.echo(f"Found {len(checkpoints)} checkpoint(s):")
+    for cp in checkpoints:
+        click.echo(f"  • {cp['run_id']} — {cp['timestamp']}")
+
+
+@cli.command("clear-checkpoint")
+@click.argument("run_id")
+def clear_checkpoint_cmd(run_id):
+    """Clear a specific checkpoint (discard partial progress)."""
+    from fairbench.checkpoint import clear_checkpoint
+
+    if clear_checkpoint(run_id):
+        click.echo(f"✅ Checkpoint cleared: {run_id}")
+    else:
+        click.echo(f"⚠️  No checkpoint found: {run_id}")
+
+
 @cli.command("list-benchmarks")
 @click.pass_context
 def list_benchmarks(ctx):

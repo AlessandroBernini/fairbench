@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
@@ -69,6 +70,7 @@ def run_quality_benchmark(
     tasks: list[str] | None = None,
     lite_mode: LiteMode = LiteMode.AUTO,
     config: BenchmarkConfig | None = None,
+    run_id: str | None = None,
 ) -> list[QualityResult]:
     """Run quality benchmarks on a model.
 
@@ -112,6 +114,8 @@ def run_quality_benchmark(
                         has_lm_eval = True
                     except ImportError:
                         print("   ✗ Still can't import lm-eval after install. Skipping benchmarks.\n")
+                else:
+                    print("   ✗ Failed to install lm-eval. Skipping benchmarks.\n")
             else:
                 print("   Skipping quality benchmarks (lm_eval not installed).\n")
 
@@ -146,6 +150,21 @@ def run_quality_benchmark(
     else:  # AUTO
         pass  # No filtering; run all available benchmarks
 
+    # Check for existing checkpoint
+    completed_benchmarks: list[str] = []
+    if run_id:
+        from fairbench.checkpoint import (
+            BenchmarkCheckpoint,
+            load_checkpoint,
+        )
+
+        checkpoint: BenchmarkCheckpoint | None = load_checkpoint(run_id)
+        if checkpoint and checkpoint.completed_benchmarks:
+            completed_benchmarks = checkpoint.completed_benchmarks
+            print(f"\n📋 Resuming from checkpoint ({len(completed_benchmarks)} benchmarks done)")
+        else:
+            print(f"\n📋 Starting new run (id: {run_id})")
+
     results = []
     total = len(benchmarks_to_run)
 
@@ -157,9 +176,14 @@ def run_quality_benchmark(
         refresh_per_second=1,
     ) as progress:
         for idx, benchmark in enumerate(benchmarks_to_run, start=1):
+            if benchmark in completed_benchmarks:
+                print(f"\n  ⏭️  Skipping {AVAILABLE_BENCHMARKS.get(benchmark, {}).get('name', benchmark)} (already done)")
+                progress.advance(progress.tasks[0].id, 1)
+                continue
+
             info = AVAILABLE_BENCHMARKS.get(benchmark, {})
             task_name = f"Benchmark {idx}/{total}: {info.get('name', benchmark)}"
-            task = progress.add_task(task_name, total=100)
+            task = progress.add_task(task_name, total=1)
 
             print(f"\n  ⏳ Running {info.get('name', benchmark)}...")
 
@@ -192,7 +216,23 @@ def run_quality_benchmark(
                     )
                 )
                 print(f"    Score: {score:.4f} ({items_correct}/{items_total}) in {elapsed:.1f}s")
-                progress.update(task, completed=100)
+                progress.update(task, completed=1)
+
+                # Save checkpoint after each benchmark
+                if run_id:
+                    from fairbench.checkpoint import save_checkpoint
+
+                    completed_benchmarks.append(benchmark)
+                    save_checkpoint(
+                        run_id,
+                        {
+                            "model_path": model_path,
+                            "category": "quality",
+                            "completed_benchmarks": completed_benchmarks,
+                            "started_at": datetime.now(timezone.utc).isoformat(),
+                            "lite_mode": lite_mode.value,
+                        },
+                    )
             except (OSError, RuntimeError) as e:
                 print(f"    Error: {e}")
                 results.append(
@@ -204,5 +244,6 @@ def run_quality_benchmark(
                         metadata={"error": str(e)},
                     )
                 )
+                progress.update(task, completed=1)
 
     return results
