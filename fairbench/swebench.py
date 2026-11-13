@@ -15,6 +15,7 @@ This module provides:
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -26,6 +27,8 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from fairbench.data import DataManager
 from fairbench.types import BenchmarkConfig, SWEbenchResult
+
+logger = logging.getLogger("fairbench")
 
 
 @dataclass
@@ -449,10 +452,10 @@ Generate the patch:
             instances = self.fetch_instances(split=split, limit=limit)
 
         if not instances:
-            print("  No instances available for evaluation")
+            logger.warning("No instances available for evaluation")
             return []
 
-        print(f"  Evaluating {len(instances)} SWE-bench instance(s)...")
+        logger.info("Evaluating %d SWE-bench instance(s)...", len(instances))
 
         results = []
         total = len(instances)
@@ -468,7 +471,7 @@ Generate the patch:
                 task_name = f"Instance {idx}/{total}: {instance.instance_id}"
                 task = progress.add_task(task_name, total=100)
 
-                print(f"\n  [{idx}/{total}] {instance.instance_id} ({instance.repo})")
+                logger.info("[%d/%d] %s (%s)", idx, total, instance.instance_id, instance.repo)
 
                 start = time.time()
                 try:
@@ -489,11 +492,11 @@ Generate the patch:
 
                     results.append(result)
                     status = "RESOLVED" if result.resolved else "FAILED"
-                    print(f"    [{status}] in {result.metadata.get('elapsed_seconds', 0):.1f}s")
+                    logger.info("[%s] in %.1fs", status, result.metadata.get("elapsed_seconds", 0))
                     progress.update(task, completed=100)
 
                 except (OSError, RuntimeError) as e:
-                    print(f"    ERROR: {e}")
+                    logger.error("ERROR: %s", e)
                     results.append(
                         SWEbenchResult(
                             repo_name=instance.repo,

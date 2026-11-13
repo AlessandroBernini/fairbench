@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime, timezone
 
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from fairbench.types import BenchmarkConfig, LiteMode, QualityResult
+
+logger = logging.getLogger("fairbench")
 
 AVAILABLE_BENCHMARKS = {
     "mmlu": {
@@ -95,10 +98,10 @@ def run_quality_benchmark(
             benchmarks_to_run = tasks
 
         if is_interactive:
-            print("\n⚠ lm_eval not found — quality benchmarks require it.")
+            logger.warning("lm_eval not found — quality benchmarks require it.")
             response = input("   Install lm-eval now? [y/N]: ").strip().lower()
             if response in ('y', 'yes'):
-                print("\n   Installing lm-eval...")
+                logger.info("Installing lm-eval...")
                 import subprocess
                 import sys
                 result = subprocess.run(
@@ -107,17 +110,17 @@ def run_quality_benchmark(
                     text=True,
                 )
                 if result.returncode == 0:
-                    print("   ✓ lm-eval installed successfully.")
+                    logger.info("lm-eval installed successfully.")
                     # Retry import
                     try:
                         from lm_eval import simple_evaluate  # type: ignore
                         has_lm_eval = True
                     except ImportError:
-                        print("   ✗ Still can't import lm-eval after install. Skipping benchmarks.\n")
+                        logger.error("Still can't import lm-eval after install. Skipping benchmarks.")
                 else:
-                    print("   ✗ Failed to install lm-eval. Skipping benchmarks.\n")
+                    logger.error("Failed to install lm-eval. Skipping benchmarks.")
             else:
-                print("   Skipping quality benchmarks (lm_eval not installed).\n")
+                logger.info("Skipping quality benchmarks (lm_eval not installed).")
 
         if not has_lm_eval:
             # Fallback to zero scores
@@ -161,9 +164,9 @@ def run_quality_benchmark(
         checkpoint: BenchmarkCheckpoint | None = load_checkpoint(run_id)
         if checkpoint and checkpoint.completed_benchmarks:
             completed_benchmarks = checkpoint.completed_benchmarks
-            print(f"\n📋 Resuming from checkpoint ({len(completed_benchmarks)} benchmarks done)")
+            logger.info("Resuming from checkpoint (%d benchmarks done)", len(completed_benchmarks))
         else:
-            print(f"\n📋 Starting new run (id: {run_id})")
+            logger.info("Starting new run (id: %s)", run_id)
 
     results = []
     total = len(benchmarks_to_run)
@@ -177,7 +180,7 @@ def run_quality_benchmark(
     ) as progress:
         for idx, benchmark in enumerate(benchmarks_to_run, start=1):
             if benchmark in completed_benchmarks:
-                print(f"\n  ⏭️  Skipping {AVAILABLE_BENCHMARKS.get(benchmark, {}).get('name', benchmark)} (already done)")
+                logger.info("Skipping %s (already done)", AVAILABLE_BENCHMARKS.get(benchmark, {}).get('name', benchmark))
                 progress.advance(progress.tasks[0].id, 1)
                 continue
 
@@ -185,7 +188,7 @@ def run_quality_benchmark(
             task_name = f"Benchmark {idx}/{total}: {info.get('name', benchmark)}"
             task = progress.add_task(task_name, total=1)
 
-            print(f"\n  ⏳ Running {info.get('name', benchmark)}...")
+            logger.info("Running %s...", info.get('name', benchmark))
 
             start = time.time()
             try:
@@ -215,7 +218,13 @@ def run_quality_benchmark(
                         },
                     )
                 )
-                print(f"    Score: {score:.4f} ({items_correct}/{items_total}) in {elapsed:.1f}s")
+                logger.info(
+                    "  Score: %.4f (%d/%d) in %.1fs",
+                    score,
+                    items_correct,
+                    items_total,
+                    elapsed,
+                )
                 progress.update(task, completed=1)
 
                 # Save checkpoint after each benchmark
@@ -234,7 +243,7 @@ def run_quality_benchmark(
                         },
                     )
             except (OSError, RuntimeError) as e:
-                print(f"    Error: {e}")
+                logger.error("Error: %s", e)
                 results.append(
                     QualityResult(
                         benchmark_name=benchmark,

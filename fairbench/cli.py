@@ -151,6 +151,8 @@ def _resolve_model_path(model_path: str) -> str:
     help="Limit SWE-bench instances (-l shorthand)",
 )
 @click.option("--publish/--no-publish", default=None, help="Override publish setting")
+@click.option("-v", "--verbose", count=True, help="Increase verbosity (-v, -vv)")
+@click.option("--log-file", "log_file", default=None, help="Path to write structured JSON logs")
 @click.pass_context
 def run(
     ctx,
@@ -165,6 +167,8 @@ def run(
     swebench_split,
     swebench_limit,
     publish,
+    verbose,
+    log_file,
 ):
     """Run benchmarks on a model.
 
@@ -178,6 +182,21 @@ def run(
     fairbench run ~/models/model.gguf --category all --lite
     fairbench run qwen2.5-7b  # Uses catalog name
     """
+    # Setup logging
+    log_level = "INFO"
+    if verbose >= 2:
+        log_level = "DEBUG"
+    elif verbose >= 1:
+        log_level = "INFO"  # Verbose adds more detail but keeps INFO level
+    logger = __import__("fairbench.logging_config", fromlist=["setup_logging"]).setup_logging(
+        level=log_level,
+        log_file=log_file,
+    )
+    logger.info("FairBench v%s", _cli_version)
+    logger.info("Logging level: %s", log_level)
+    if log_file:
+        logger.info("Log file: %s", log_file)
+
     # Resolve catalog name → file path
     resolved_path = _resolve_model_path(model_path)
 
