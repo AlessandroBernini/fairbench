@@ -1,0 +1,27 @@
+# FairBench Docker Compose with GPU support
+#
+# Usage:
+#   docker compose up --build          # Start (CPU-only)
+#   docker compose --profile gpu up    # With NVIDIA GPU
+#
+# GPU requires nvidia-container-toolkit installed on host.
+
+version: '3.8'
+
+services:
+  fairbench:
+    build: .
+    volumes:
+      - ./models:/app/models:ro
+      - ~/.fairbench:/root/.fairbench
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - gpu

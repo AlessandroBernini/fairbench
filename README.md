@@ -1,8 +1,7 @@
-# FairBench
-
-AI model benchmarking suite with SWE-bench integration.
-
-Evaluate AI models across multiple dimensions: quality, speed, memory usage, and software engineering capability.
+# FairBench — AI model benchmarking suite with SWE-bench integration.
+#
+# Evaluate AI models across multiple dimensions: quality, speed, memory usage,
+# and software engineering capability.
 
 ## Quick Start
 
@@ -81,6 +80,12 @@ fairbench run ~/models/model.gguf --n-threads 8 --quant q5_k_m
 
 # Category shorthand (-k), tasks shorthand (-t), lite flag
 fairbench run model.gguf -k quality -t mmlu,ifeval --lite
+
+# Run inside Docker container (auto-builds if needed)
+fairbench run --docker ~/models/model.gguf
+
+# Run with verbose logging and file output
+fairbench run ~/models/model.gguf -vv --log-file /tmp/fairbench.log
 ```
 
 ### SWE-bench dedicated command
@@ -204,6 +209,66 @@ swebench_split: full
 ## Publishing
 
 By default, every benchmark run is **automatically published** to the public leaderboard. Set `publish: false` in config to disable.
+
+## Docker Support
+
+Run FairBench in a reproducible container for consistent benchmark results across environments.
+
+### Quick Docker usage
+
+```bash
+# Build and run (auto-detects GPU support)
+docker build -t fairbench .
+docker run --rm -v ~/models:/app/models:ro fairbench verify
+
+# Benchmark with GPU access (requires nvidia-container-toolkit)
+docker run --rm --gpus all \
+  -v ~/models:/app/models:ro \
+  -v ~/.fairbench:/root/.fairbench \
+  fairbench run /app/models/model.gguf --category all --lite
+```
+
+### Docker Compose (GPU support)
+
+```yaml
+version: '3.8'
+services:
+  fairbench:
+    build: .
+    volumes:
+      - ./models:/app/models:ro
+      - ~/.fairbench:/root/.fairbench
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+Run with `docker compose up --build`.
+
+### Docker considerations
+
+| Platform | GPU support | Notes |
+|----------|-------------|-------|
+| Linux + NVIDIA | ✅ Full | Requires `nvidia-container-toolkit` |
+| Linux + AMD | ✅ ROCm | Set `HSA_OVERRIDE_GFX_VERSION=10.3.0` |
+| macOS (Docker Desktop) | ❌ CPU only | No GPU passthrough on macOS |
+| WSL2 + Windows | ✅ Partial | Depends on host GPU driver |
+
+### CI/CD with GitHub Actions
+
+Use the included workflow to benchmark on every push:
+
+```yaml
+# .github/workflows/benchmark.yml (included in repo)
+```
+
+Run manually: Actions → Benchmark workflow.
 
 ## Optional Dependencies
 

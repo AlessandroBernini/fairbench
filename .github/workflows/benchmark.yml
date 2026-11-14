@@ -1,0 +1,43 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install FairBench
+        run: |
+          pip install --upgrade pip
+          pip install fairbench-ai[dev]
+
+      - name: Verify installation
+        run: fairbench verify
+
+      - name: Download test model
+        run: |
+          pip install huggingface_hub
+          huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct \
+            --include 'Qwen2.5-1.5B-Instruct-Q4_K_M.gguf' \
+            --local-dir /tmp/models/
+
+      - name: Run quality benchmarks (lite)
+        run: |
+          fairbench run /tmp/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf \
+            --category quality --lite
+
+      - name: List results
+        run: fairbench results --category quality
