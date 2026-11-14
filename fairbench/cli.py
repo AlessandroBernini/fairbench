@@ -1163,5 +1163,125 @@ from fairbench.interactive import interactive_cmd
 cli.add_command(interactive_cmd)
 
 
+@cli.command("list-plugins")
+def list_plugins_cmd():
+    """List all available benchmark plugins (built-in and custom)."""
+    from fairbench.plugins.base import PluginRegistry
+
+    plugins = PluginRegistry.list_plugins()
+    if not plugins:
+        click.echo("No plugins found.")
+        return
+
+    click.echo(f"\nBenchmark Plugins ({len(plugins)}):")
+    click.echo("-" * 70)
+    click.echo(f"  {'Name':<20s} {'Version':<10s} {'Category':<12s} {'Description'}")
+    click.echo("-" * 70)
+
+    for plugin in plugins:
+        meta = plugin.get_metadata() if hasattr(plugin, "get_metadata") else {}
+        desc = meta.get("description", plugin.description)[:40]
+        click.echo(
+            f"  {plugin.name:<20s} v{plugin.version:<9s} {plugin.category:<12s} {desc}"
+        )
+    click.echo()
+
+
+@cli.group("plugin")
+def plugin_cmd():
+    """Manage benchmark plugins."""
+
+
+@plugin_cmd.command("info")
+@click.argument("name")
+def plugin_info_cmd(name):
+    """Show detailed info for a plugin.
+
+    NAME is the plugin name (e.g., 'mmlu', 'hellaswag').
+    """
+    from fairbench.plugins.base import PluginRegistry
+
+    plugin = PluginRegistry.get_plugin(name)
+    if not plugin:
+        click.echo(f"Plugin '{name}' not found.")
+        available = [p.name for p in PluginRegistry.list_plugins()]
+        if available:
+            click.echo(f"Available plugins: {', '.join(available)}")
+        return
+
+    meta = plugin.get_metadata() if hasattr(plugin, "get_metadata") else {}
+
+    click.echo(f"\nPlugin: {plugin.name}")
+    click.echo("=" * 50)
+    click.echo(f"  Version:      {plugin.version}")
+    click.echo(f"  Category:     {plugin.category}")
+    click.echo(f"  Description:  {plugin.description}")
+
+    if meta:
+        click.echo("\nMetadata:")
+        for key, value in meta.items():
+            click.echo(f"  {key}: {value}")
+    click.echo()
+
+
+@plugin_cmd.command("install")
+@click.argument("package")
+def plugin_install_cmd(package):
+    """Install a plugin from PyPI.
+
+    PACKAGE is the PyPI package name (e.g., 'fairbench-hellaswag-lite').
+    """
+    import subprocess
+    import sys
+
+    click.echo(f"Installing plugin: {package}")
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", package],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        click.echo("✅ Plugin installed successfully.")
+        click.echo(f"\n{result.stdout[-500:] if result.stdout else '(no output)'}")
+
+        # Reload plugins to discover the new one
+        from fairbench.plugins.base import PluginRegistry
+
+        PluginRegistry.discover_file_plugins()
+        click.echo(f"\nPlugin '{package}' is now available. Run 'fairbench list-plugins' to see it.")
+    except subprocess.CalledProcessError as e:
+        click.echo(f"❌ Failed to install plugin: {e}")
+        click.echo(f"stderr: {e.stderr[-200:] if e.stderr else '(no stderr)'}")
+        raise SystemExit(1)
+
+
+@plugin_cmd.command("uninstall")
+@click.argument("name")
+def plugin_uninstall_cmd(name):
+    """Uninstall a custom plugin.
+
+    NAME is the plugin name or file pattern in ~/.fairbench/plugins/custom/
+    """
+    from pathlib import Path
+
+    custom_dir = Path.home() / ".fairbench" / "plugins" / "custom"
+    if not custom_dir.exists():
+        click.echo(f"No custom plugins directory at {custom_dir}")
+        return
+
+    target = custom_dir / f"{name}.py"
+    if not target.exists():
+        click.echo(f"Plugin file not found: {target}")
+        click.echo("Available plugins:")
+        for f in sorted(custom_dir.glob("*.py")):
+            if f.name != "__init__.py":
+                click.echo(f"  {f.stem}")
+        return
+
+    target.unlink()
+    click.echo(f"✅ Uninstalled plugin: {name}")
+
+
 if __name__ == "__main__":
     cli()
