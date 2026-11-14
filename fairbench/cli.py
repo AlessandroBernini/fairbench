@@ -153,6 +153,9 @@ def _resolve_model_path(model_path: str) -> str:
 @click.option("--publish/--no-publish", default=None, help="Override publish setting")
 @click.option("-v", "--verbose", count=True, help="Increase verbosity (-v, -vv)")
 @click.option("--log-file", "log_file", default=None, help="Path to write structured JSON logs")
+@click.option("--docker", is_flag=True, help="Run benchmarks inside Docker container (auto-builds if needed)")
+@click.option("--docker-image", "docker_image", default="fairbench:latest", help="Docker image to use")
+@click.option("--ci", is_flag=True, help="Run in CI mode (no TTY, no progress bars)")
 @click.pass_context
 def run(
     ctx,
@@ -169,6 +172,9 @@ def run(
     publish,
     verbose,
     log_file,
+    docker,
+    docker_image,
+    ci,
 ):
     """Run benchmarks on a model.
 
@@ -196,6 +202,50 @@ def run(
     logger.info("Logging level: %s", log_level)
     if log_file:
         logger.info("Log file: %s", log_file)
+
+    # Handle Docker mode
+    if docker:
+        from fairbench.docker import (
+            build_docker_image,
+            detect_gpu_support,
+            run_in_docker,
+            verify_docker_setup,
+        )
+
+        # Verify Docker is available
+        docker_info = verify_docker_setup()
+        if docker_info["docker_available"] != "Yes":
+            click.echo("❌ Docker is not installed or not in PATH.")
+            click.echo("   Install Docker: https://docs.docker.com/get-docker/")
+            raise SystemExit(1)
+
+        # Check macOS GPU limitation
+        import platform
+        if platform.system() == "Darwin":
+            click.echo("⚠️  Note: Docker on macOS runs in CPU-only mode (no GPU passthrough)")
+
+        # Build image if needed
+        build_result = build_docker_image(docker_image)
+        if not build_result:
+            click.echo("❌ Failed to build Docker image. Exiting.")
+            raise SystemExit(1)
+
+        # Detect GPU support
+        gpu_support = detect_gpu_support()
+
+        # Determine category string for Docker
+        cat_str = category if category != "all" else "all"
+
+        # Run in container
+        exit_code = run_in_docker(
+            image_name=docker_image,
+            model_path=model_path,
+            category=cat_str,
+            lite_mode="enabled" if lite else "disabled",
+            gpu_support=gpu_support,
+            ci_mode=ci,
+        )
+        raise SystemExit(exit_code)
 
     # Resolve catalog name → file path
     resolved_path = _resolve_model_path(model_path)
