@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestDockerDetection:
     """Test Docker detection functions."""
@@ -33,7 +31,7 @@ class TestDockerDetection:
 
     def test_detect_docker_file_not_found(self):
         """Test detecting Docker when command not found."""
-        import subprocess
+        import subprocess  # noqa: F401 (used in side_effect)
 
         with patch(
             "subprocess.run", side_effect=FileNotFoundError("docker not found")
@@ -51,37 +49,36 @@ class TestGpuSupportDetection:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_result):
-            with patch("platform.system", return_value="Linux"):
-                from fairbench.docker import detect_gpu_support
+        with patch("subprocess.run", return_value=mock_result), patch(
+            "platform.system", return_value="Linux"
+        ):
+            from fairbench.docker import detect_gpu_support
 
-                assert detect_gpu_support() == "nvidia"
+            assert detect_gpu_support() == "nvidia"
 
     def test_detect_rocm_gpu(self):
         """Test detecting AMD ROCm GPU support."""
-        import os
-
         mock_result = MagicMock()
         mock_result.returncode = 1  # nvidia-smi not found
 
-        with patch("subprocess.run", return_value=mock_result):
-            with patch("platform.system", return_value="Linux"):
-                with patch("os.path.exists", return_value=True):
-                    from fairbench.docker import detect_gpu_support
+        with patch("subprocess.run", return_value=mock_result), patch(
+            "platform.system", return_value="Linux"
+        ), patch("os.path.exists", return_value=True):
+            from fairbench.docker import detect_gpu_support
 
-                    assert detect_gpu_support() == "rocm"
+            assert detect_gpu_support() == "rocm"
 
     def test_detect_none_gpu(self):
         """Test detecting no GPU support."""
         mock_result = MagicMock()
         mock_result.returncode = 1  # nvidia-smi not found
 
-        with patch("subprocess.run", return_value=mock_result):
-            with patch("platform.system", return_value="Linux"):
-                with patch("os.path.exists", return_value=False):
-                    from fairbench.docker import detect_gpu_support
+        with patch("subprocess.run", return_value=mock_result), patch(
+            "platform.system", return_value="Linux"
+        ), patch("os.path.exists", return_value=False):
+            from fairbench.docker import detect_gpu_support
 
-                    assert detect_gpu_support() == "none"
+            assert detect_gpu_support() == "none"
 
 
 class TestMacOsDetection:
@@ -119,29 +116,26 @@ class TestVerifyDockerSetup:
         """Test verification with GPU support."""
         with patch(
             "fairbench.docker.detect_docker_available", return_value=True
+        ), patch("fairbench.docker.detect_gpu_support", return_value="nvidia"), patch(
+            "fairbench.docker.detect_macos_docker_limitation", return_value=False
         ):
-            with patch("fairbench.docker.detect_gpu_support", return_value="nvidia"):
-                with patch("fairbench.docker.detect_macos_docker_limitation", return_value=False):
-                    from fairbench.docker import verify_docker_setup
+            from fairbench.docker import verify_docker_setup
 
-                    info = verify_docker_setup()
-                    assert info["docker_available"] == "Yes"
-                    assert info["gpu_support"] == "Nvidia"
+            info = verify_docker_setup()
+            assert info["docker_available"] == "Yes"
+            assert info["gpu_support"] == "Nvidia"
 
     def test_verify_macos_gpu_limitation(self):
         """Test macOS GPU limitation note."""
         with patch(
             "fairbench.docker.detect_docker_available", return_value=True
+        ), patch("fairbench.docker.detect_gpu_support", return_value="none"), patch(
+            "fairbench.docker.detect_macos_docker_limitation", return_value=True
         ):
-            with patch("fairbench.docker.detect_gpu_support", return_value="none"):
-                with patch(
-                    "fairbench.docker.detect_macos_docker_limitation",
-                    return_value=True,
-                ):
-                    from fairbench.docker import verify_docker_setup
+            from fairbench.docker import verify_docker_setup
 
-                    info = verify_docker_setup()
-                    assert "note" in info
+            info = verify_docker_setup()
+            assert "note" in info
 
 
 class TestBuildDockerImage:
@@ -158,17 +152,15 @@ class TestBuildDockerImage:
 
         with patch(
             "fairbench.docker.Path.exists", return_value=True
-        ):
-            with patch.object(
-                __import__("pathlib", fromlist=["Path"]).Path,
-                "__truediv__",
-                return_value=dockerfile,
-            ):
-                with patch("subprocess.run", return_value=mock_result):
-                    from fairbench.docker import build_docker_image
+        ), patch.object(
+            __import__("pathlib", fromlist=["Path"]).Path,
+            "__truediv__",
+            return_value=dockerfile,
+        ), patch("subprocess.run", return_value=mock_result):
+            from fairbench.docker import build_docker_image
 
-                    result = build_docker_image("test-image")
-                    assert result is True
+            result = build_docker_image("test-image")
+            assert result is True
 
     def test_build_missing_dockerfile(self):
         """Test build fails when Dockerfile not found."""
@@ -224,7 +216,9 @@ class TestRunInDocker:
         """Test handling Docker timeout."""
         import subprocess
 
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("docker", 3600)):
+        with patch(
+            "subprocess.run", side_effect=subprocess.TimeoutExpired("docker", 3600)
+        ):
             from fairbench.docker import run_in_docker
 
             exit_code = run_in_docker(
