@@ -91,12 +91,6 @@ def run_quality_benchmark(
         # Check if we're in a non-interactive environment (CI, cron, etc.)
         is_interactive = hasattr(__import__('sys').stdin, 'isatty') and __import__('sys').stdin.isatty()
 
-        benchmarks_to_run = (
-            [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())
-        )
-        if tasks:
-            benchmarks_to_run = tasks
-
         if is_interactive:
             logger.warning("lm_eval not found — quality benchmarks require it.")
             response = input("   Install lm-eval now? [y/N]: ").strip().lower()
@@ -123,21 +117,10 @@ def run_quality_benchmark(
                 logger.info("Skipping quality benchmarks (lm_eval not installed).")
 
         if not has_lm_eval:
-            # Fallback to zero scores
-            results = []
-            for name in benchmarks_to_run:
-                info = AVAILABLE_BENCHMARKS.get(name, {})
-                results.append(
-                    QualityResult(
-                        benchmark_name=name,
-                        score=0.0,
-                        items_total=0,
-                        items_correct=0,
-                        metadata={"reason": "lm_eval not installed", "fallback": True},
-                    )
-                )
-            return results
-        # If user said yes and install succeeded, continue to benchmark execution below
+            raise ImportError(
+                "lm-eval is required for quality benchmarks. "
+                "Install it with: pip install 'fairbench-ai[ml]'"
+            )
 
     # Determine which benchmarks to run
     benchmarks_to_run = [benchmark_name] if benchmark_name else list(AVAILABLE_BENCHMARKS.keys())

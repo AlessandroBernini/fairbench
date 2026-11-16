@@ -331,8 +331,7 @@ def cmd_init():
     if missing:
         print()
         print("  ⚠️  Missing dependencies will affect benchmark capabilities:")
-        install_cmd = f"pip install fairbench-ai[{','.join(missing)}]"
-        print(f"  Install with: {install_cmd}")
+        print('  Install with: pip install "fairbench-ai[ml]"')
 
     # Show paths
     print()
