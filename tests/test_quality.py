@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from fairbench.quality import (
     AVAILABLE_BENCHMARKS,
     get_lite_benchmarks,
@@ -65,22 +67,22 @@ class TestRunQualityBenchmark:
             # Verify the score was parsed correctly
             assert result[0].score == 0.75
 
-    def test_graceful_degradation_without_lm_eval(self):
-        """run_quality_benchmark returns zero scores when lm_eval is unavailable."""
+    def test_raises_actionable_error_without_lm_eval(self):
+        """run_quality_benchmark fails loudly instead of publishing fake zero scores."""
         # Mock the import inside the quality module
-        with patch.dict("sys.modules", {"lm_eval": None}):
-            result = run_quality_benchmark(
+        with patch.dict("sys.modules", {"lm_eval": None}), pytest.raises(ImportError, match="fairbench-ai\\[ml\\]"):
+            run_quality_benchmark(
                 model_path="/nonexistent/model.gguf",
                 benchmark_name="mmlu",
             )
-            for r in result:
-                assert r.score == 0.0
-                assert "fallback" in r.metadata
 
     def test_all_benchmarks_when_no_benchmark_specified(self):
         """run_quality_benchmark runs all benchmarks when no benchmark_name given."""
-        with patch.dict("sys.modules", {"lm_eval": None}):
+        fake_lm_eval = MagicMock()
+        fake_lm_eval.simple_evaluate.return_value = {"results": {}}
+        with patch.dict("sys.modules", {"lm_eval": fake_lm_eval}):
             result = run_quality_benchmark(
                 model_path="/nonexistent/model.gguf",
             )
             assert len(result) == len(AVAILABLE_BENCHMARKS)
+            assert fake_lm_eval.simple_evaluate.call_count == len(AVAILABLE_BENCHMARKS)
