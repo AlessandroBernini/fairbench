@@ -37,6 +37,9 @@ include = ["fairbench*"]
 [tool.setuptools]
 license-files = []
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py310"
 line-length = 99

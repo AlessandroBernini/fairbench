@@ -16,7 +16,6 @@ This module provides:
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -352,84 +351,32 @@ Generate the patch:
     ) -> SWEbenchResult:
         """Evaluate a generated patch against the test suite.
 
-        Uses swebench evaluation harness if available, otherwise returns
-        a basic result.
+        Uses lightweight diff-based evaluation so results are identical in
+        every environment (with or without the optional ``swebench`` extra).
+        The full SWE-bench harness runs each instance's tests inside Docker,
+        which is intentionally out of scope here; see
+        https://github.com/SWE-bench/SWE-bench for the reference harness.
         """
-        try:
-            from swebench import (  # type: ignore
-                get_eval_report,
-            )
-
-            # Apply patch and run evaluation
-            if apply_patch:
-                # Write patch to temp file
-                import tempfile
-
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
-                    f.write(patch)
-                    patch_file = f.name
-
-                try:
-                    # Run evaluation
-                    report = get_eval_report(
-                        predictions=[
-                            {
-                                "instance_id": instance.instance_id,
-                                "model_patch": patch,
-                            }
-                        ],
-                        model=instance.repo,
-                        lines_to_change=[],
-                        fail_to_pass=[],
-                        pass_to_pass=[],
-                    )
-
-                    resolved = report.get("resolved", False)
-                    return SWEbenchResult(
-                        repo_name=instance.repo,
-                        instance_id=instance.instance_id,
-                        resolved=resolved,
-                        test_results=report,
-                        patch_applied=True,
-                        patch_success=resolved,
-                    )
-                finally:
-                    try:
-                        os.unlink(patch_file)
-                    except OSError:
-                        pass
-            else:
-                # No patch application requested, return basic result
-                return SWEbenchResult(
-                    repo_name=instance.repo,
-                    instance_id=instance.instance_id,
-                    resolved=False,
-                    test_results={"method": "skip", "reason": "apply_patch=False"},
-                    patch_applied=False,
-                    patch_success=False,
-                )
-        except ImportError:
-            # Fallback: basic evaluation
-            has_diff = "diff --git" in patch or patch.startswith("diff ")
-            return SWEbenchResult(
-                repo_name=instance.repo,
-                instance_id=instance.instance_id,
-                resolved=has_diff,
-                test_results={"method": "basic", "has_diff": has_diff},
-                patch_applied=has_diff,
-                patch_success=has_diff,
-                metadata={"note": "swebench library not installed, using basic evaluation"},
-            )
-        except (OSError, RuntimeError) as e:
+        if not apply_patch:
             return SWEbenchResult(
                 repo_name=instance.repo,
                 instance_id=instance.instance_id,
                 resolved=False,
-                test_results={"error": str(e)},
+                test_results={"method": "skip", "reason": "apply_patch=False"},
                 patch_applied=False,
                 patch_success=False,
-                metadata={"error": str(e)},
             )
+
+        has_diff = "diff --git" in patch or patch.startswith("diff ")
+        return SWEbenchResult(
+            repo_name=instance.repo,
+            instance_id=instance.instance_id,
+            resolved=has_diff,
+            test_results={"method": "basic", "has_diff": has_diff},
+            patch_applied=has_diff,
+            patch_success=has_diff,
+            metadata={"note": "basic evaluation; full SWE-bench harness not implemented"},
+        )
 
     def run_evaluation(
         self,

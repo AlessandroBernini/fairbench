@@ -230,7 +230,7 @@ class TestSWEbenchClientEvaluate:
 
         assert result.instance_id == "django-django-1"
         assert result.repo_name == "django/django"
-        assert "swebench library not installed" in str(result.metadata)
+        assert "basic evaluation" in str(result.metadata)
 
 
 class TestSWEbenchClientGeneratePatch:
