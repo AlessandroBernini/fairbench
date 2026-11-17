@@ -1,16 +1,13 @@
 """Tests for fairbench.install module."""
 
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from fairbench.install import (
     check_dependencies,
     cmd_init,
-    cmd_show_paths,
     cmd_quick_start,
+    cmd_show_paths,
     print_post_install_message,
 )
 

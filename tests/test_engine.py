@@ -86,3 +86,24 @@ class TestBenchmarkEngine:
 
             assert isinstance(lite, list)
             assert len(lite) > 0
+
+
+class TestBenchmarkEngineAdditional:
+    def test_get_swebench_instances_default(self):
+        with patch("fairbench.engine.load_config") as mock_load:
+            mock_config = MagicMock()
+            mock_config.results_dir = "/tmp/results"
+            mock_load.return_value = mock_config
+            engine = BenchmarkEngine()
+            instances = engine.get_swebench_instances()
+            assert isinstance(instances, list)
+
+    def test_list_swebench_splits(self):
+        with patch("fairbench.engine.load_config") as mock_load:
+            mock_config = MagicMock()
+            mock_config.results_dir = "/tmp/results"
+            mock_load.return_value = mock_config
+            engine = BenchmarkEngine()
+            splits = engine.list_swebench_splits()
+            assert isinstance(splits, dict)
+
