@@ -12,7 +12,7 @@ def get_latest_pypi_version(package_name="fairbench-ai"):
     try:
         result = subprocess.run(
             ["pip", "index", "versions", package_name],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10, check=False,
         )
         # Output format: "Available versions: 0.5.0, 0.4.1, 0.4.0, ..."
         match = result.stdout.strip()
@@ -21,7 +21,7 @@ def get_latest_pypi_version(package_name="fairbench-ai"):
         # Parse the first (latest) version
         versions = [v.strip() for v in match.split(":")[1].split(",")]
         return versions[0] if versions else None
-    except Exception:
+    except Exception:  # noqa: BLE001 — best-effort lookup; any failure means "no PyPI data"
         return None
 
 
@@ -76,7 +76,7 @@ def commit_and_push(version):
 def main():
     # 1. Check if we already bumped (look for [skip ci] in latest commit)
     result = subprocess.run(
-        ["git", "log", "-1", "--pretty=%B"], capture_output=True, text=True
+        ["git", "log", "-1", "--pretty=%B"], capture_output=True, text=True, check=True
     )
     if "[skip ci]" in result.stdout:
         print("Version already bumped in this run. Skipping.")

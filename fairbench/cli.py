@@ -60,7 +60,7 @@ def init():
     cmd_init()
 
 
-@click.command("download")
+@cli.command("download")
 @click.argument("model_id", required=True)
 @click.option("--filename", "-f", help="Specific GGUF file to download")
 @click.option("--local-dir", "-d", default=None, help="Target directory (default: ~/models/)")

@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from pathlib import Path
 
 
 async def main():
@@ -20,14 +21,14 @@ async def main():
     db = NeonDatabase(neon_url)
     await db.connect()
 
-    # Read schema
-    schema_sql = open("schema.sql").read()
+    # Read schema off the event loop (blocking file I/O)
+    schema_sql = await asyncio.to_thread(Path("schema.sql").read_text)
 
     # Apply schema
     try:
         await db.execute(schema_sql)
         print("✅ Schema applied successfully")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — first-run errors are expected; report and verify tables below
         print(f"⚠️  Schema error (may be normal on first run): {e}")
 
     # Verify tables
