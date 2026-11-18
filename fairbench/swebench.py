@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import requests
@@ -86,6 +86,17 @@ SWEBENCH_SOURCES = {
     },
 }
 
+# HuggingFace dataset names per split (swebench>=2.x naming)
+SPLIT_TO_DATASET = {
+    "full": "princeton-nlp/SWE-bench",
+    "lite": "princeton-nlp/SWE-bench_Lite",
+    "verified": "princeton-nlp/SWE-bench_Verified",
+}
+
+# Public HF datasets-server API (no auth required for these public datasets)
+_ROWS_URL = "https://datasets-server.huggingface.co/rows"
+_PAGE_SIZE = 100
+
 
 class SWEbenchClient:
     """Client for SWE-bench evaluation."""
@@ -104,86 +115,32 @@ class SWEbenchClient:
         split: str = "full",
         limit: int | None = None,
     ) -> list[SWEbenchInstance]:
-        """List available SWE-bench instances from HuggingFace."""
-        source_url = SWEBENCH_SOURCES.get(split, SWEBENCH_SOURCES["full"])["url"]
+        """List available SWE-bench instances for a split.
 
-        # Check cache first
-        cache_key = f"swebench_instances_{split}"
-        cached = self.data.get_cached_result("swebench", cache_key)
-        if cached is not None and isinstance(cached, list):
-            return [
-                SWEbenchInstance(
-                    instance_id=str(item.get("instance_id", "")),
-                    repo=str(item.get("repo", "")),
-                    base_commit=str(item.get("base_commit", "")),
-                    problem_id=item.get("problem_id"),
-                    hints_text=str(item.get("hints_text", "")),
-                    test_patch=str(item.get("test_patch", "")),
-                    code_language=str(item.get("code_language", "python")),
-                    version=str(item.get("version", "1.0")),
-                )
-                for item in (cached[:limit] if limit else cached)
-            ]
-
-        # Fetch from HuggingFace datasets API
-        try:
-            hf_url = f"https://huggingface.co/api/datasets/{source_url.split('/')[-1]}"
-            response = requests.get(hf_url, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-
-            # Extract instances from dataset info
-            instances = []
-            if "siblings" in data:
-                for sibling in data["siblings"]:
-                    if sibling.get("rfilename", "").endswith(".json"):
-                        instances.append(sibling["rfilename"])
-
-            self.data.save_cached_result("swebench", cache_key, instances)
-            return instances[:limit] if limit else instances
-        except requests.RequestException:
-            return []
+        Returns fully-populated :class:`SWEbenchInstance` objects; each
+        fetched instance is also cached individually as a side effect.
+        """
+        return self.fetch_instances(split=split, limit=limit)
 
     def fetch_instance(
         self,
         instance_id: str,
         split: str = "full",
     ) -> SWEbenchInstance | None:
-        """Fetch a single SWE-bench instance from HuggingFace."""
-        # Check cache
+        """Fetch a single SWE-bench instance (local cache first, then datasets-server)."""
         cached = self.data.load_swebench_instance(instance_id)
         if cached:
-            return SWEbenchInstance(**cached)
+            return self._row_to_instance(cached)
 
-        # Fetch from HuggingFace
+        dataset = SPLIT_TO_DATASET.get(split, SPLIT_TO_DATASET["full"])
         try:
-            hf_url = (
-                f"https://huggingface.co/datasets/princeton-nlp/SWE-bench"
-                f"/resolve/main/{split}/{instance_id}.json"
-            )
-            response = requests.get(hf_url, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-
-            instance = SWEbenchInstance(
-                instance_id=data.get("instance_id", instance_id),
-                repo=data.get("repo", ""),
-                base_commit=data.get("base_commit", ""),
-                problem_id=data.get("problem_id"),
-                hints_text=data.get("hints_text", ""),
-                test_patch=data.get("test_patch", ""),
-                code_language=data.get("code_language", "python"),
-                version=data.get("version", "1.0"),
-                problem_statement=data.get("problem_statement"),
-                created_at=data.get("created_at"),
-                tags=data.get("tags", []),
-            )
-
-            # Cache it
-            self.data.save_swebench_instance(instance_id, data)
-            return instance
+            for row in self._iter_rows(dataset):
+                if str(row.get("instance_id", "")) == instance_id:
+                    self.data.save_swebench_instance(instance_id, dict(row))
+                    return self._row_to_instance(row)
         except requests.RequestException:
             return None
+        return None
 
     def fetch_instances(
         self,
@@ -193,55 +150,85 @@ class SWEbenchClient:
     ) -> list[SWEbenchInstance]:
         """Fetch multiple SWE-bench instances.
 
+        Uses the ``swebench`` library when available (optional ``[ml]``
+        extra), otherwise falls back to the public HuggingFace
+        datasets-server API.
+
         Args:
             split: Benchmark split (full, lite, verified)
             limit: Maximum number of instances to fetch
-            repo_filter: Filter by repository name
+            repo_filter: Filter by repository name (substring match)
         """
-        instances = []
-        fetched_ids = set()
-
-        # Use swebench library if available for proper fetching
+        dataset = SPLIT_TO_DATASET.get(split, SPLIT_TO_DATASET["full"])
         try:
-            from swebench import INSTANCE_IDS  # type: ignore
+            from swebench.harness.utils import load_swebench_dataset  # type: ignore
 
-            all_ids = INSTANCE_IDS.get(split, [])
-            if repo_filter:
-                all_ids = [iid for iid in all_ids if repo_filter in self._get_repo_from_id(iid)]
-
-            for iid in all_ids[:limit] if limit else all_ids:
-                instance = self.fetch_instance(iid, split)
-                if instance:
-                    instances.append(instance)
-                    fetched_ids.add(iid)
-        except ImportError:
-            # Fallback: use HuggingFace API
-            hf_url = (
-                f"https://huggingface.co/api/datasets"
-                f"/princeton-nlp/SWE-bench_{split.capitalize()}"
-                f"/tree/main"
+            rows: Iterable[dict[str, Any]] = list(
+                load_swebench_dataset(name=dataset, split="test")
             )
-            try:
-                response = requests.get(hf_url, timeout=30)
-                response.raise_for_status()
-                files = response.json()
+        except ImportError:
+            rows = self._iter_rows(dataset)
 
-                for file in files:
-                    if file.get("type") == "file" and file["path"].endswith(".json"):
-                        iid = Path(file["path"]).stem
-                        if iid not in fetched_ids:
-                            if repo_filter and repo_filter not in iid:
-                                continue
-                            instance = self.fetch_instance(iid, split)
-                            if instance:
-                                instances.append(instance)
-                                fetched_ids.add(iid)
-                                if limit and len(instances) >= limit:
-                                    break
-            except requests.RequestException:
-                pass
+        instances: list[SWEbenchInstance] = []
+        try:
+            for row in rows:
+                if repo_filter and repo_filter not in str(row.get("repo", "")):
+                    continue
+                instance = self._row_to_instance(row)
+                self.data.save_swebench_instance(instance.instance_id, dict(row))
+                instances.append(instance)
+                if limit and len(instances) >= limit:
+                    break
+        except requests.RequestException:
+            pass  # return what was collected before the failure
 
         return instances
+
+    def _fetch_rows(self, dataset: str, offset: int = 0) -> list[dict[str, Any]]:
+        """Fetch one page of instance rows from the HF datasets-server API."""
+        params: dict[str, str | int] = {
+            "dataset": dataset,
+            "config": "default",
+            "split": "test",
+            "offset": offset,
+            "length": _PAGE_SIZE,
+        }
+        response = requests.get(_ROWS_URL, params=params, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+        return [entry["row"] for entry in payload.get("rows", [])]
+
+    def _iter_rows(self, dataset: str) -> Iterator[dict[str, Any]]:
+        """Yield all instance rows for a dataset, paginating lazily."""
+        offset = 0
+        while True:
+            page = self._fetch_rows(dataset, offset=offset)
+            yield from page
+            if len(page) < _PAGE_SIZE:
+                return
+            offset += _PAGE_SIZE
+
+    @staticmethod
+    def _row_to_instance(row: dict[str, Any]) -> SWEbenchInstance:
+        """Convert a raw dataset/cache row into a :class:`SWEbenchInstance`."""
+        instance = SWEbenchInstance(
+            instance_id=str(row.get("instance_id", "")),
+            repo=str(row.get("repo", "")),
+            base_commit=str(row.get("base_commit", "")),
+            problem_id=row.get("problem_id"),
+            hints_text=str(row.get("hints_text") or ""),
+            test_patch=str(row.get("test_patch") or ""),
+            code_language=str(row.get("code_language") or "python"),
+            version=str(row.get("version") or "1.0"),
+        )
+        if row.get("problem_statement") is not None:
+            instance.problem_statement = str(row["problem_statement"])
+        if row.get("created_at") is not None:
+            instance.created_at = str(row["created_at"])
+        tags = row.get("tags")
+        if isinstance(tags, list):
+            instance.tags = [str(tag) for tag in tags]
+        return instance
 
     def _get_repo_from_id(self, instance_id: str) -> str:
         """Extract repo name from instance ID (format: org/repo-number)."""
