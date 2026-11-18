@@ -53,6 +53,7 @@ def check_requirements():
         result = subprocess.run(
             [sys.executable, "-m", "pip", "show", pkg],
             capture_output=True,
+            check=False,
         )
         if result.returncode != 0:
             errors.append(f"{pkg} not installed. Run: pip install {pkg}")
@@ -68,6 +69,7 @@ def build_package():
         cwd=ROOT,
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         print(f"❌ Build failed:\n{result.stderr}")
@@ -99,7 +101,7 @@ def upload_package(dry_run=False):
     if dry_run:
         cmd.append("--dry-run")
 
-    result = subprocess.run(cmd, cwd=ROOT)
+    result = subprocess.run(cmd, cwd=ROOT, check=False)
     return result.returncode == 0
 
 

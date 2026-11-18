@@ -10,7 +10,7 @@ Requires huggingface_hub >= 2.0 (list_models API changes).
 """
 
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -49,7 +49,8 @@ def discover_new_gguf_models(days_threshold: int = 30, max_scan: int = 2000) -> 
         # NOTE: siblings from list_models is empty; must call model_info() to get files
         try:
             full_info = api.model_info(repo_id)
-        except Exception:
+        except Exception as e:  # noqa: BLE001 — transient HF API errors shouldn't kill weekly discovery
+            print(f"⚠️  Skipping {repo_id}: {e}")
             continue
 
         siblings = getattr(full_info, "siblings", None) or []

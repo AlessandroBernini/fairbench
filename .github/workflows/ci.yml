@@ -31,7 +31,7 @@ jobs:
         run: pytest -q --cov=fairbench --cov-report=term --cov-fail-under=50 --tb=short
 
       - name: Lint with ruff
-        run: ruff check fairbench/ tests/
+        run: ruff check fairbench/ tests/ scripts/
 
       - name: Type check with mypy
         run: mypy fairbench/ --ignore-missing-imports

@@ -24,7 +24,7 @@ def setup():
         print("   NEON_DATABASE_URL=postgresql://... python scripts/setup.py")
         sys.exit(1)
 
-    print(f"🔌 Connecting to Neon...")
+    print("🔌 Connecting to Neon...")
     conn = psycopg2.connect(neon_url)
     conn.autocommit = True
     cur = conn.cursor()
