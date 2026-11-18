@@ -1,5 +1,6 @@
 """Tests for SWE-bench integration."""
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -168,26 +169,31 @@ class TestSWEbenchClientFetch:
     def client(self):
         return SWEbenchClient()
 
-    def test_fetch_instance_fallback_without_swebench(self, client):
-        """Test fetch_instance falls back gracefully when swebench not installed."""
+    def test_fetch_instance_scans_rows_on_cache_miss(self, client):
+        """fetch_instance finds an instance via datasets-server rows when not cached."""
+        row = {
+            "instance_id": "django__django-1",
+            "repo": "django/django",
+            "base_commit": "abc123",
+            "test_patch": "",
+            "problem_statement": "Fix it",
+            "hints_text": "",
+            "version": "1.0",
+        }
         with (
             patch.object(client.data, "load_swebench_instance", return_value=None),
-            patch("requests.get") as mock_get,
+            patch.object(client.data, "save_swebench_instance") as mock_save,
+            patch.dict(sys.modules, {"swebench": None}),
+            patch("fairbench.swebench.requests.get") as mock_get,
         ):
             mock_get.return_value.raise_for_status = MagicMock()
-            mock_get.return_value.json.return_value = {
-                "instance_id": "django-django-1",
-                "repo": "django/django",
-                "base_commit": "abc123",
-                "hints_text": "",
-                "test_patch": "",
-                "code_language": "python",
-                "version": "1.0",
-            }
+            mock_get.return_value.json.return_value = {"rows": [{"row": row}]}
 
-            instance = client.fetch_instance("django-django-1", split="full")
+            instance = client.fetch_instance("django__django-1", split="lite")
             assert instance is not None
-            assert instance.instance_id == "django-django-1"
+            assert instance.instance_id == "django__django-1"
+            assert instance.repo == "django/django"
+            mock_save.assert_called_once()
 
     def test_fetch_instance_returns_none_on_error(self, client):
         """Test fetch_instance returns None on network error."""
@@ -199,6 +205,112 @@ class TestSWEbenchClientFetch:
 
             instance = client.fetch_instance("django-django-1", split="full")
             assert instance is None
+
+
+class TestSWEbenchDataFetching:
+    """Tests for swebench 2.x API integration and datasets-server fallback."""
+
+    @pytest.fixture
+    def client(self):
+        return SWEbenchClient()
+
+    @staticmethod
+    def _row(iid="astropy__astropy-12907", repo="astropy/astropy"):
+        return {
+            "instance_id": iid,
+            "repo": repo,
+            "base_commit": "abc123def",
+            "patch": "",
+            "test_patch": "diff --git a/t.py b/t.py",
+            "problem_statement": "Fix the thing",
+            "hints_text": "hint",
+            "created_at": "2023-05-01",
+            "version": "1.4",
+        }
+
+    def test_split_to_dataset_mapping(self):
+        from fairbench.swebench import SPLIT_TO_DATASET
+
+        assert SPLIT_TO_DATASET["full"] == "princeton-nlp/SWE-bench"
+        assert SPLIT_TO_DATASET["lite"] == "princeton-nlp/SWE-bench_Lite"
+        assert SPLIT_TO_DATASET["verified"] == "princeton-nlp/SWE-bench_Verified"
+
+    def test_fetch_instances_uses_swebench_library_when_available(self, client):
+        """Primary path: swebench.harness.utils.load_swebench_dataset (real 2.x API)."""
+        fake_utils = MagicMock()
+        fake_utils.load_swebench_dataset.return_value = [self._row()]
+        with patch.dict(
+            sys.modules,
+            {
+                "swebench": MagicMock(),
+                "swebench.harness": MagicMock(),
+                "swebench.harness.utils": fake_utils,
+            },
+        ):
+            instances = client.fetch_instances(split="lite", limit=1)
+
+        assert len(instances) == 1
+        assert isinstance(instances[0], SWEbenchInstance)
+        assert instances[0].instance_id == "astropy__astropy-12907"
+        fake_utils.load_swebench_dataset.assert_called_once_with(
+            name="princeton-nlp/SWE-bench_Lite", split="test"
+        )
+
+    def test_fetch_instances_falls_back_to_datasets_server(self, client):
+        """Fallback path: HF datasets-server /rows when swebench lib is absent."""
+        rows = [self._row("a__b-1", "a/b"), self._row("c__d-2", "c/d")]
+        with (
+            patch.dict(sys.modules, {"swebench": None}),
+            patch.object(client.data, "save_swebench_instance"),
+            patch("fairbench.swebench.requests.get") as mock_get,
+        ):
+            mock_get.return_value.raise_for_status = MagicMock()
+            mock_get.return_value.json.return_value = {
+                "rows": [{"row": r} for r in rows]
+            }
+
+            instances = client.fetch_instances(split="lite", limit=2)
+
+        assert [i.instance_id for i in instances] == ["a__b-1", "c__d-2"]
+        args, kwargs = mock_get.call_args
+        url = args[0] if args else kwargs.get("url", "")
+        assert "datasets-server.huggingface.co/rows" in str(url)
+        params = kwargs.get("params", {})
+        assert params.get("dataset") == "princeton-nlp/SWE-bench_Lite"
+
+    def test_fetch_instances_repo_filter(self, client):
+        rows = [self._row("a__b-1", "a/b"), self._row("c__d-2", "c/d")]
+        with (
+            patch.dict(sys.modules, {"swebench": None}),
+            patch.object(client.data, "save_swebench_instance"),
+            patch("fairbench.swebench.requests.get") as mock_get,
+        ):
+            mock_get.return_value.raise_for_status = MagicMock()
+            mock_get.return_value.json.return_value = {
+                "rows": [{"row": r} for r in rows]
+            }
+
+            instances = client.fetch_instances(split="lite", repo_filter="c/d")
+
+        assert [i.instance_id for i in instances] == ["c__d-2"]
+
+    def test_fetch_instances_network_error_returns_empty(self, client):
+        with (
+            patch.dict(sys.modules, {"swebench": None}),
+            patch("fairbench.swebench.requests.get") as mock_get,
+        ):
+            mock_get.side_effect = requests.RequestException("boom")
+            assert client.fetch_instances(split="lite") == []
+
+    def test_list_available_instances_returns_instance_objects(self, client):
+        """Regression: must return SWEbenchInstance objects, not filename strings."""
+        with patch.object(
+            client, "fetch_instances", return_value=[SWEbenchClient._row_to_instance(self._row())]
+        ) as mock_fetch:
+            out = client.list_available_instances(split="lite", limit=3)
+
+        assert len(out) == 1 and isinstance(out[0], SWEbenchInstance)
+        mock_fetch.assert_called_once_with(split="lite", limit=3)
 
 
 class TestSWEbenchClientEvaluate:
