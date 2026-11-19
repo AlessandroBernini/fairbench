@@ -42,6 +42,7 @@ def cli(ctx, config_path):
 
     Examples:
       fairbench init
+      fairbench init --wizard
       fairbench download Qwen/Qwen2.5-1.5B-Instruct
       fairbench run ~/models/qwen2.5-7b.gguf
       fairbench run model.gguf --category quality --tasks mmlu hellaswag
@@ -51,13 +52,6 @@ def cli(ctx, config_path):
     """
     ctx.ensure_object(dict)
     ctx.obj["config"] = load_config(config_path)
-
-
-@cli.command()
-def init():
-    """Interactive setup wizard — creates config, checks dependencies, shows paths."""
-    from fairbench.install import cmd_init
-    cmd_init()
 
 
 @cli.command("download")
@@ -1023,12 +1017,25 @@ def compare_cmd(ctx, run_ids, models, categories, fmt, sort_by):
 
 
 @cli.command("init")
+@click.option(
+    "--wizard",
+    "-w",
+    is_flag=True,
+    help="Run the interactive setup wizard (prompts for username, publishing, hardware).",
+)
 @click.pass_context
-def init_cmd(ctx):
+def init_cmd(ctx, wizard):
     """Initialize FairBench configuration.
 
     Creates ~/.fairbench/config.yaml with sensible defaults if it doesn't already exist.
+    Use --wizard for an interactive guided setup instead.
     """
+    if wizard:
+        from fairbench.install import cmd_init
+
+        cmd_init()
+        return
+
     from fairbench.config import (
         CONFIG_PATH,
         _default_config,
