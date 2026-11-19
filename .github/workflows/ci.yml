@@ -28,7 +28,7 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run tests with pytest (coverage gate)
-        run: pytest -q --cov=fairbench --cov-report=term --cov-fail-under=50 --tb=short
+        run: pytest -q --cov=fairbench --cov-report=term --cov-fail-under=75 --tb=short
 
       - name: Lint with ruff
         run: ruff check fairbench/ tests/ scripts/
