@@ -6,6 +6,7 @@ processes are mocked at the boundary.
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -13,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from fairbench import cli as cli_module
 from fairbench.cli import _estimate_model_size, _resolve_model_path, cli
 from fairbench.config import BenchmarkConfig
 
@@ -100,6 +102,64 @@ class TestInitCmd:
         with patch("fairbench.config.CONFIG_PATH", target):
             result = runner.invoke(cli, ["init"])
         assert "already exists" in result.output
+
+    def test_wizard_flag_delegates_to_install_cmd_init(
+        self, runner: CliRunner, cfg: BenchmarkConfig
+    ) -> None:
+        """`init --wizard` must run the interactive setup wizard."""
+        with patch("fairbench.install.cmd_init") as wizard:
+            result = runner.invoke(cli, ["init", "--wizard"])
+        assert result.exit_code == 0, result.output
+        wizard.assert_called_once()
+
+    def test_default_init_never_prompts(
+        self, runner: CliRunner, cfg: BenchmarkConfig, tmp_path: Path
+    ) -> None:
+        """`init` without --wizard stays scriptable: no interactive delegation."""
+        target = tmp_path / "cfg.yaml"
+        with (
+            patch("fairbench.config.CONFIG_PATH", target),
+            patch("fairbench.config.save_config"),
+            patch("fairbench.install.cmd_init") as wizard,
+        ):
+            result = runner.invoke(cli, ["init"], input="")
+        assert result.exit_code == 0, result.output
+        wizard.assert_not_called()
+
+
+class TestCliSourceIntegrity:
+    """Structural guards against silent registration bugs (F6 download / F8 init)."""
+
+    @staticmethod
+    def _registered_names() -> list[str]:
+        tree = ast.parse(Path(cli_module.__file__).read_text(encoding="utf-8"))
+        names: list[str] = []
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            for dec in node.decorator_list:
+                if (
+                    isinstance(dec, ast.Call)
+                    and isinstance(dec.func, ast.Attribute)
+                    and isinstance(dec.func.value, ast.Name)
+                    and dec.func.value.id == "cli"
+                    and dec.func.attr == "command"
+                ):
+                    first = dec.args[0] if dec.args else None
+                    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                        names.append(first.value)
+                    else:
+                        names.append(node.name)
+        return names
+
+    def test_no_duplicate_cli_command_registrations(self) -> None:
+        names = self._registered_names()
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        assert not dupes, f"duplicate @cli.command registrations (last silently wins): {dupes}"
+
+    def test_every_registered_command_reachable_in_group(self) -> None:
+        missing = [n for n in self._registered_names() if n not in cli.commands]
+        assert not missing, f"@cli.command names absent from cli.commands: {missing}"
 
 
 class TestValidateConfigCmd:
