@@ -9,8 +9,11 @@
 # Install FairBench (includes all benchmarking dependencies)
 pip install fairbench-ai
 
-# Interactive setup wizard (creates config, checks dependencies)
+# Create default config (~/.fairbench/config.yaml)
 fairbench init
+
+# ...or run the interactive setup wizard
+fairbench init --wizard
 
 # Run benchmarks on a GGUF model
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
@@ -166,13 +169,14 @@ fairbench quick-start
 ### Setup and paths
 
 ```bash
-fairbench init                # Interactive setup wizard
+fairbench init                # Create default config (non-interactive, scriptable)
+fairbench init --wizard       # Interactive setup wizard (-w)
 fairbench show-paths          # Show config & results locations
 ```
 
-`fairbench init` creates the `~/.fairbench/` directory, generates a default config if it doesn't exist, checks available dependencies (lm-eval, llama-cpp-python, swebench), and displays a quick start guide.
+`fairbench init` creates `~/.fairbench/config.yaml` with sensible defaults if it doesn't already exist — non-interactive by design so it works in scripts, Dockerfiles, and CI.
 
-> **Note:** The wizard now prompts for leaderboard username, publishing preference (default: enabled), GPU layers, and quantization type.
+> **Note:** `fairbench init --wizard` (or `-w`) runs the interactive setup wizard instead: it creates the full directory structure, prompts for leaderboard username and publishing preference (default: enabled), checks available dependencies (lm-eval, llama-cpp-python, swebench), and suggests hardware-aware settings.
 
 `fairbench show-paths` lists all paths used by FairBench (config, results, package location) without hardcoded strings.
 
