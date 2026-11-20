@@ -45,7 +45,7 @@ def cli(ctx, config_path):
       fairbench init --wizard
       fairbench download Qwen/Qwen2.5-1.5B-Instruct
       fairbench run ~/models/qwen2.5-7b.gguf
-      fairbench run model.gguf --category quality --tasks mmlu hellaswag
+      fairbench run model.gguf --category quality --tasks mmlu --tasks hellaswag
       fairbench run model.gguf --category speed
       fairbench verify
       fairbench quick-start
@@ -177,7 +177,7 @@ def run(
     Examples:
     \b
     fairbench run ~/models/qwen3-35b-q4_k_m.gguf
-    fairbench run ~/models/model.gguf --category quality --tasks mmlu hellaswag
+    fairbench run ~/models/model.gguf --category quality --tasks mmlu --tasks hellaswag
     fairbench run ~/models/model.gguf --category swebench --swebench-split lite
     fairbench run ~/models/model.gguf --category all --lite
     fairbench run qwen2.5-7b  # Uses catalog name

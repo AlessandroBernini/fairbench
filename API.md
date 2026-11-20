@@ -1,43 +1,57 @@
 # FairBench API Routes
 
 ## POST /api/report
-Submit a benchmark report.
+Submit a benchmark report. This is the payload sent by `fairbench`'s reporter (`fairbench/reporter.py`).
 
-**Request body:**
+**Required fields:** `model_name`, `quantization` (missing either → `400`).
+
+**Request body (current format, as sent by the CLI):**
 ```json
 {
-  "id": "abc123",
+  "run_id": "abc123",
+  "model_name": "qwen2.5-7b-instruct",
+  "quantization": "q4_k_m",
+  "n_ctx": 4096,
+  "n_gpu_layers": -1,
+  "n_threads": 8,
   "timestamp": "2026-10-23_110000",
-  "published": true,
-  "model": {
-    "name": "qwen2.5-7b-instruct",
-    "quantization": "q4_k_m"
-  },
+  "category": "all",
   "hardware": {
-    "cpu": { "model": "Intel i7", "cores": 8, "threads": 16 },
+    "cpu_model": "Intel i7",
+    "cpu_cores": 8,
+    "cpu_threads": 16,
     "ram_gb": 32,
-    "gpu": { "type": "nvidia", "model": "RTX 4070 Ti", "vram_gb": 12 },
+    "gpu_type": "nvidia",
+    "gpu_model": "RTX 4070 Ti",
+    "gpu_vram_gb": 12,
     "os": "Linux 6.8"
   },
-  "quality": {
+  "quality_scores": {
     "mmlu": 0.623,
     "hellaswag": 0.834,
     "gsm8k": 0.712
   },
   "speed": {
     "ttft_ms": 145.2,
-    "tpot_ms": 12.8,
+    "tpot_ms": 78.1,
     "throughput": 78.1
   },
   "memory": {
     "vram_peak_gb": 4.8,
-    "cpu_ram_peak_gb": 6.2,
-    "model_file_size_gb": 4.2
+    "cpu_ram_peak_gb": 6.2
+  },
+  "swebench": {
+    "resolved": 3,
+    "total": 10
   }
 }
 ```
 
-**Response:**
+> **Note:** `speed.tpot_ms` carries a token *rate* (tokens/s) despite the column name — see README "Speed". A code fix to rename/recompute is tracked separately.
+
+**Legacy format:** the server also accepts older clients that send nested `model: {name, quantization}` and top-level `id`; these are mapped to the same columns. Unknown/missing optional fields default to `0` / `"none"` / generated UUID (`run_id`) / current time.
+
+**Response (`201`):**
 ```json
 {
   "success": true,
@@ -48,6 +62,8 @@ Submit a benchmark report.
   }
 }
 ```
+
+Errors: `400` invalid body or missing required fields, `500` database error (`{"error": ...}`).
 
 ## GET /api/leaderboard
 Get the leaderboard with optional filters.

@@ -1,13 +1,19 @@
 # FairBench — AI model benchmarking suite with SWE-bench integration.
-#
-# Evaluate AI models across multiple dimensions: quality, speed, memory usage,
-# and software engineering capability.
+
+Evaluate AI models across multiple dimensions: quality, speed, memory usage,
+and software engineering capability.
 
 ## Quick Start
 
 ```bash
-# Install FairBench (includes all benchmarking dependencies)
+# Install the core CLI (results, config, leaderboard tooling)
 pip install fairbench-ai
+
+# Full ML stack for quality benchmarks and SWE-bench evaluation
+pip install "fairbench-ai[ml]"
+
+# Speed/memory benchmarks need llama-cpp-python (compiled; see Optional Dependencies)
+pip install llama-cpp-python
 
 # Create default config (~/.fairbench/config.yaml)
 fairbench init
@@ -19,7 +25,7 @@ fairbench init --wizard
 fairbench run ~/models/qwen3-35b-q4_k_m.gguf
 ```
 
-> **Note:** llama-cpp-python is required for speed/memory benchmarks. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`). Auto-version bumping is enabled on push to main.
+> **Note:** speed/memory benchmarks require `llama-cpp-python`. On Apple Silicon, Xcode command-line tools are required (`xcode-select --install`). Auto-version bumping is enabled on push to main.
 
 ## Benchmarks
 
@@ -38,22 +44,28 @@ FairBench evaluates models on **8 quality benchmarks** (7 lite, 1 full):
 | **LiveBench** | 2024/2025 anti-contamination benchmark | Yes | Multiple tasks |
 | **HumanEval** | Code generation (Pass@1) | No | 164 tasks |
 
+Requires the `[ml]` extra (`lm-eval`). If `lm-eval` is not installed, FairBench asks whether to install it interactively; in non-interactive environments (CI/cron) the quality benchmark is skipped with a warning.
+
 ### Speed
 
-- **TTFT** (Time to First Token) — latency
-- **TPOT** (Tokens Per Second) — throughput
-- Measured via `llama-cpp-python`
+Measured via `llama-cpp-python` bindings over 3 averaged runs (falls back to the `llama-bench` CLI if bindings are unavailable):
+
+- **TTFT** (Time To First Token) — first-token latency, in ms
+- **TPOT** — generation speed sampled as a token rate (tokens/s) over sliding windows. *Note:* despite the historical name and API column (`speed_tpot_ms`), this value is a **rate**, not milliseconds per token
+- **Throughput** — generated tokens / total wall-clock time, in tokens/s
 
 ### Memory
 
-- **VRAM peak** — GPU memory usage
-- **RAM peak** — CPU memory usage
+- **VRAM peak** — GPU memory usage (via `nvidia-smi` when available)
+- **RAM peak** — CPU memory usage (via `psutil`)
+
+Works without extra dependencies.
 
 ### SWE-bench
 
 - Evaluate models on **GitHub issue resolution** tasks
 - Splits: **full** (all issues), **lite** (10% stratified sample), **verified** (human-verified only)
-- Fetches real issues from the SWE-bench dataset
+- Fetches real issues from the SWE-bench dataset (requires `[ml]` extra)
 
 ## Usage
 
@@ -63,8 +75,8 @@ FairBench evaluates models on **8 quality benchmarks** (7 lite, 1 full):
 # All categories (quality + speed + memory)
 fairbench run ~/models/model.gguf --category all
 
-# Quality only with specific benchmarks
-fairbench run ~/models/model.gguf --category quality --tasks mmlu hellaswag
+# Quality only with specific benchmarks (--tasks is repeatable, NOT comma-separated)
+fairbench run ~/models/model.gguf --category quality --tasks mmlu --tasks hellaswag
 
 # Lite mode (faster, smaller benchmark subsets)
 fairbench run ~/models/model.gguf --category all --lite
@@ -78,18 +90,43 @@ fairbench run ~/models/model.gguf --category swebench --swebench-split verified 
 # Custom context window and GPU layers
 fairbench run ~/models/model.gguf --n-ctx 8192 --n-gpu-layers 30
 
-# CPU threads and quantization (not in README before)
+# CPU threads and quantization
 fairbench run ~/models/model.gguf --n-threads 8 --quant q5_k_m
 
-# Category shorthand (-k), tasks shorthand (-t), lite flag
-fairbench run model.gguf -k quality -t mmlu,ifeval --lite
+# Category shorthand, repeated task shorthand, lite flag
+fairbench run model.gguf -k quality -t mmlu -t ifeval --lite
 
-# Run inside Docker container (auto-builds if needed)
+# Force or skip leaderboard publishing for this run only
+fairbench run model.gguf --publish
+fairbench run model.gguf --no-publish
+
+# Run inside Docker container (builds/updates the image, layer-cached)
 fairbench run --docker ~/models/model.gguf
 
-# Run with verbose logging and file output
+# Run with verbose logging and file output (-v INFO, -vv DEBUG)
 fairbench run ~/models/model.gguf -vv --log-file /tmp/fairbench.log
 ```
+
+#### `run` options (as implemented)
+
+| Flag | Shorthand | Default | Description |
+|------|-----------|---------|-------------|
+| `MODEL_PATH` | — | required | Path to a GGUF file, or a catalog name (`fairbench models list`) |
+| `--category` | `-k` | `all` | `all`, `quality`, `speed`, `memory`, `swebench` |
+| `--tasks` | `-t` | all lite-compatible | Repeatable: specific quality benchmarks (e.g. `-t mmlu -t ifeval`) |
+| `--n-ctx` | `-n` | config `default_n_ctx` | Context window size |
+| `--n-gpu-layers` | `-g` | config `default_n_gpu_layers` | GPU offload layers (-1 = all) |
+| `--n-threads` | `-j` | config `default_threads` | CPU threads (0 = auto) |
+| `--quant` | `-q` | config `default_quant` | Quantization label |
+| `--lite` | — | off | Use lite benchmark subsets |
+| `--swebench-split` | `-s` | `full` | `full`, `lite`, or `verified` |
+| `--swebench-limit` | `-l` | config `swebench_instances` | Max SWE-bench instances |
+| `--publish` / `--no-publish` | — | from config | Override leaderboard publishing for this run |
+| `--verbose` | `-v`, `-vv` | WARNING | INFO with `-v`, DEBUG with `-vv` |
+| `--log-file PATH` | — | none | Structured JSON log file |
+| `--docker` | — | off | Run the benchmark inside a Docker container |
+| `--docker-image NAME` | — | `fairbench:latest` | Image used for `--docker` runs |
+| `--ci` | — | off | CI mode (no TTY, no progress bars) |
 
 ### SWE-bench dedicated command
 
@@ -99,33 +136,43 @@ fairbench swebench-eval ~/models/model.gguf --split lite --limit 10
 fairbench swebench-eval model.gguf -s verified -r flask --limit 5
 ```
 
-### List available benchmarks
+`--split/-s` default `full`, `--limit/-l` default `5`, `--repo-filter/-r` filters by repository.
+
+### List available benchmarks and instances
 
 ```bash
 fairbench list-benchmarks
-fairbench list-swebench
+fairbench list-swebench                  # default: split=full, limit=10
+fairbench list-swebench --split verified -l 20
 ```
 
-### View results
+## Command reference
 
-```bash
-fairbench results
-fairbench results --category quality
-```
-
-### View leaderboard
-
-```bash
-fairbench leaderboard
-fairbench leaderboard -l 50
-```
-
-### Manage configuration
-
-```bash
-fairbench config --show       # Show current config
-fairbench config --set key=value  # Set a config value
-```
+| Command | Description |
+|---------|-------------|
+| `run MODEL` | Run benchmarks (see options above) |
+| `interactive` | Guided interactive benchmark configuration and run |
+| `quick-start` | Demo plan with available benchmarks and models |
+| `results [--category/-c]` | List local benchmark results |
+| `compare [-r runs] [-m model] [-c category] [-f console\|csv\|json] [-s sort-by]` | Compare results across models/runs |
+| `export [-f csv\|json] [-r runs] [-c category] [-m model]` | Export results to CSV or JSON |
+| `report RUN_ID [--open/-o]` | Generate HTML report for a run |
+| `radar RUN_ID [--save/-s PATH]` | Radar/spider chart for a run |
+| `leaderboard [--limit/-l N]` | Show the public leaderboard (default 20) |
+| `checkpoints [--cleanup]` | List or clean up benchmark checkpoints |
+| `clear-checkpoint RUN_ID` | Discard partial progress for a run |
+| `download MODEL_ID [-f filename] [-d dir]` | Download a GGUF model from HuggingFace |
+| `models list/add/info/search/remove/recommend` | Manage the local GGUF model catalog (`--scan` to include disk scan) |
+| `recommend MODEL_PATH [--model-size/-s B]` | Optimal config recommendations for a model |
+| `list-plugins` / `plugin install PACKAGE` / `plugin uninstall NAME` / `plugin info NAME` | Benchmark plugin management |
+| `profile` | Detected hardware and recommended settings |
+| `hw-profile` | Hardware profile and cache status |
+| `verify` | Verify installation and system readiness |
+| `init [--wizard/-w]` | Create config (non-interactive) or run setup wizard |
+| `config --show/-s` / `config --set/-S key=value` | Inspect or update configuration |
+| `validate-config` | Validate the current config file |
+| `fix-config` | Auto-fix common configuration issues |
+| `show-paths` | Show all FairBench directories and file locations |
 
 ## Tools
 
@@ -210,9 +257,16 @@ swebench_split: full
 | `swebench_instances` | `0` | SWE-bench instance limit (0 = unlimited) |
 | `swebench_split` | `full` | Default SWE-bench split (`full`, `lite`, `verified`) |
 
+These are the only accepted keys. `fairbench config --set key=value` validates keys and coerces types (`publish` accepts booleans; numeric keys accept int/float). Use `fairbench validate-config` to check a file and `fairbench fix-config` to auto-repair common issues (e.g. empty values for `default_n_gpu_layers` / `default_quant`).
+
 ## Publishing
 
-By default, every benchmark run is **automatically published** to the public leaderboard. Set `publish: false` in config to disable.
+By default, every benchmark run is **automatically published** to the public leaderboard:
+
+- Global toggle: `publish: true|false` in `~/.fairbench/config.yaml`
+- Per-run override: `fairbench run MODEL --no-publish` (skip) or `--publish` (force, even if config disables it)
+
+Publishing POSTs the report to `{api_url}/report`; if the API is unreachable the run completes normally with a warning and results stay local. See [API.md](API.md) for the payload schema.
 
 ## Docker Support
 
@@ -230,7 +284,13 @@ docker run --rm --gpus all \
   -v ~/models:/app/models:ro \
   -v ~/.fairbench:/root/.fairbench \
   fairbench run /app/models/model.gguf --category all --lite
+
+# Or let the CLI drive Docker (builds/updates fairbench:latest, layer-cached)
+fairbench run --docker ~/models/model.gguf
+fairbench run --docker --docker-image my-fairbench:1.0 ~/models/model.gguf
 ```
+
+`--docker` verifies Docker availability, warns on macOS about CPU-only mode, builds the image (Docker layer cache makes repeat runs fast), detects GPU support (`nvidia` / `rocm` / `none`), and mounts model paths read-only into the container. Add `--ci` for headless runs without progress bars.
 
 ### Docker Compose (GPU support)
 
@@ -262,36 +322,37 @@ Run with `docker compose up --build`.
 | Linux + NVIDIA | ✅ Full | Requires `nvidia-container-toolkit` |
 | Linux + AMD | ✅ ROCm | Set `HSA_OVERRIDE_GFX_VERSION=10.3.0` |
 | macOS (Docker Desktop) | ❌ CPU only | No GPU passthrough on macOS |
-| WSL2 + Windows | ✅ Partial | Depends on host GPU driver |
+| WSL2 + Windows | ⚠️ Limited | Depends on host GPU driver |
 
 ### CI/CD with GitHub Actions
 
-Use the included workflow to benchmark on every push:
+The repository ships four workflows under `.github/workflows/`:
 
-```yaml
-# .github/workflows/benchmark.yml (included in repo)
-```
-
-Run manually: Actions → Benchmark workflow.
+- `ci.yml` — lint (ruff), type check (mypy), tests with coverage gate
+- `release.yml` — auto version bump + PyPI publish on push to main
+- `benchmark.yml` — manual benchmark run (Actions → Run workflow)
+- `discover-models.yml` — weekly HuggingFace model discovery, proposes registry additions via PR
 
 ## Optional Dependencies
 
-Core features (quality benchmarks, SWE-bench, CLI) work out of the box with `pip install fairbench-ai`.
+The published package metadata defines these extras:
 
-Additional components:
+| Extra | Contents | Needed for |
+|-------|----------|------------|
+| *(core)* | click, pyyaml, requests, psutil, rich | CLI, results, config, leaderboard |
+| `[ml]` | `lm-eval>=0.4,<1.0`, `swebench>=2.0,<3.0` | Quality benchmarks, SWE-bench evaluation |
+| `[all]` | `fairbench-ai[ml]` | Convenience alias for the ML stack |
+| `[dev]` | pytest, pytest-cov, ruff, mypy, huggingface-hub | Contributing / CI |
+
+`llama-cpp-python` is **not** part of any extra (it requires C build tools). Install it separately for speed/memory benchmarks:
 
 ```bash
-# Speed/memory benchmarks (requires llama-cpp-python, compiled from source)
-pip install llama-cpp-python
-
-# Model download helper (used by 'fairbench download')
-pip install huggingface_hub
-
-# Development tools (pytest, ruff, mypy)
-pip install fairbench-ai[dev]
+pip install llama-cpp-python          # tries precompiled wheels first
+sudo apt-get install cmake build-essential   # if a source build is needed (Debian/Ubuntu)
+brew install cmake llvm                      # macOS equivalent
 ```
 
-> **Note:** If `lm-eval` is not installed when running a benchmark, FairBench will interactively ask if you want to install it automatically. In non-interactive environments (CI/cron), it skips the quality benchmark and prints a warning.
+When installing from a source checkout (`python setup.py install`), the custom `setup.py` attempts this automatically with wheel preference (`LLAMA_CPP_FORCE_BUILD=0`) and skips it in CI environments.
 
 ## Requirements
 
