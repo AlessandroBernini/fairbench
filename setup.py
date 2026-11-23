@@ -49,7 +49,7 @@ class CustomInstall(install):
 
 setup(
     name="fairbench-ai",
-    version="0.3.0",
+    version="0.18.11",
     description="FairBench - AI model benchmarking suite with SWE-bench integration",
     author="Alessandro Bernini",
     url="https://github.com/AlessandroBernini/fairbench",

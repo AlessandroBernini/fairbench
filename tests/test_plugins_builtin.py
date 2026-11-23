@@ -40,12 +40,26 @@ def test_plugin_instantiation_and_metadata(plugin_cls, expected_name):
     assert callable(getattr(plugin, "run", None))
 
 
-def test_gsm8k_run_raises_without_lm_eval():
+def test_gsm8k_run_raises_without_lm_eval(monkeypatch):
     plugin = GSM8KBenchmark()
-    # Run should raise RuntimeError about missing lm-eval when import fails
-    with pytest.raises(RuntimeError) as exc:
-        plugin.run("/nonexistent/model.gguf", {})
-    assert "lm-eval" in str(exc.value).lower()
+    # Block lm_eval import by inserting a meta_path finder
+    import sys
+
+    class _BlockLmEval:
+        def find_spec(self, name, path, target=None):
+            if name == "lm_eval":
+                raise ImportError("No module named 'lm_eval'")
+            return None
+
+    blocker = _BlockLmEval()
+    sys.meta_path.insert(0, blocker)
+    monkeypatch.delitem(sys.modules, "lm_eval", raising=False)
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            plugin.run("/nonexistent/model.gguf", {})
+        assert "lm-eval" in str(exc.value).lower()
+    finally:
+        sys.meta_path.remove(blocker)
 
 
 def test_hellaswag_metadata_lite_flag():
