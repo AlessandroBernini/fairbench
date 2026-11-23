@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from fairbench.backend import benchmark_memory, benchmark_speed
+import pytest
+
+from fairbench.backend import _compute_speed_metrics, benchmark_memory, benchmark_speed
 
 
 class TestBenchmarkMemory:
@@ -49,3 +51,21 @@ class TestBenchmarkSpeed:
         assert hasattr(result, "tpot_avg")
         assert hasattr(result, "throughput_avg")
         assert hasattr(result, "runs")
+
+
+def test_compute_speed_metrics_standard_definition() -> None:
+    """_compute_speed_metrics uses the standard llama-bench definition.
+
+    ttft=100ms, total=600ms, 10 token -> decode 500ms su 9 gap
+    tpot_ms = 500.0 / 9 ≈ 55.56 ms/token
+    throughput = 10 / 0.5 = 20.0 tokens/s
+    """
+    tpot_ms, throughput = _compute_speed_metrics(100.0, 0.6, 10)
+    assert tpot_ms == pytest.approx(500.0 / 9)
+    assert throughput == pytest.approx(10 / 0.5)
+
+
+def test_compute_speed_metrics_edge_cases() -> None:
+    """_compute_speed_metrics returns (0.0, 0.0) when tokens <= 1."""
+    assert _compute_speed_metrics(50.0, 0.1, 0) == (0.0, 0.0)
+    assert _compute_speed_metrics(50.0, 0.1, 1) == (0.0, 0.0)

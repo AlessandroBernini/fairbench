@@ -15,6 +15,22 @@ from fairbench.types import MemoryResult, SpeedResult
 logger = logging.getLogger("fairbench")
 
 
+def _compute_speed_metrics(
+    ttft_ms: float, total_time_s: float, total_tokens: int
+) -> tuple[float, float]:
+    """Return (tpot_ms, throughput_tps) from measured timings.
+
+    TPOT = decode time per token after the first (standard definition).
+    Throughput = generated tokens / decode time.
+    """
+    if total_tokens <= 1:
+        return 0.0, 0.0
+    decode_time_s = max(total_time_s - ttft_ms / 1000.0, 1e-9)
+    tpot_ms = decode_time_s * 1000.0 / (total_tokens - 1)
+    throughput = total_tokens / decode_time_s
+    return tpot_ms, throughput
+
+
 def benchmark_speed(
     model_path: str,
     prompt: str = "The quick brown fox jumps over the lazy dog. " * 10,
