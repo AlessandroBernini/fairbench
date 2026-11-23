@@ -49,7 +49,7 @@ class Reporter:
             lines.append("\nSpeed Results:")
             lines.append("-" * 40)
             lines.append(f"  TTFT: {sr['ttft_avg']:.2f} ms")
-            lines.append(f"  TPOT: {sr['tpot_avg']:.4f} tokens/s")
+            lines.append(f"  TPOT: {sr['tpot_avg']:.4f} ms/token")
             lines.append(f"  Throughput: {sr['throughput_avg']:.2f} tokens/s")
 
         if results.get("memory_result"):
