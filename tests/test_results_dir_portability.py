@@ -22,3 +22,10 @@ def test_results_dir_tracks_home_between_instances(monkeypatch, tmp_path: Path):
     second = BenchmarkConfig()
     assert first.results_dir == str(tmp_path / "first" / ".fairbench" / "results")
     assert second.results_dir == str(tmp_path / "second" / ".fairbench" / "results")
+
+
+def test_default_config_does_not_create_results_directory(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    expected = tmp_path / ".fairbench" / "results"
+    assert BenchmarkConfig().results_dir == str(expected)
+    assert not expected.exists()
