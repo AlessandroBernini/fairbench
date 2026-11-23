@@ -120,7 +120,8 @@ class BenchmarkConfig:
     default_quant: str = "q4_k_m"
     default_threads: int = 0
     publish: bool = True
-    # Resolve the current user home for each new config instance.\n    results_dir: str = field(default_factory=lambda: str(Path.home() / ".fairbench" / "results"))
+    # Resolve the current user home for each new config instance.
+    results_dir: str = field(default_factory=lambda: str(Path.home() / ".fairbench" / "results"))
     lite_mode: LiteMode = LiteMode.AUTO
     swebench_instances: int = 0
     swebench_split: str = "full"
