@@ -1,5 +1,6 @@
 // GET /api/models - Get model statistics (averages)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getDb, getDbError } from './db';
 
 export const config = {
   api: {
@@ -24,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Get all models with stats
     const result = await sql`
       SELECT 
-        model_name,
+        model_name as name,
         ROUND(AVG(quality_mmlu)::numeric, 4) as avg_mmlu,
         ROUND(AVG(quality_hellaswag)::numeric, 4) as avg_hellaswag,
         ROUND(AVG(quality_gsm8k)::numeric, 4) as avg_gsm8k,
