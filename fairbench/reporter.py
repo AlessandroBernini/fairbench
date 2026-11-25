@@ -73,14 +73,45 @@ class Reporter:
         lines.append(f"\n{'=' * 60}")
         return "\n".join(lines)
 
+    def _resolve_hardware(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Map a benchmark result to the hardware payload expected by POST /api/report.
+
+        Supports both the ``hardware_snapshot`` dict produced by the engine
+        (snake_case keys) and flat legacy keys on the result itself.
+        """
+        hw = result.get("hardware_snapshot") or result.get("hardware") or {}
+        if not isinstance(hw, dict):
+            hw = {}
+
+        cpu_model = str(hw.get("cpu_model") or result.get("cpu_model") or "")
+        cpu_cores = int(hw.get("cpu_cores") or result.get("cpu_cores") or 0)
+        cpu_threads = int(hw.get("cpu_threads") or result.get("cpu_threads") or 0)
+        ram_gb = float(hw.get("total_ram_gb") or hw.get("ram_gb") or result.get("ram_gb") or result.get("total_ram_gb") or 0.0)
+        gpu_type = str(hw.get("gpu_type") or result.get("gpu_type") or "none")
+        gpu_model = str(hw.get("gpu_model") or result.get("gpu_model") or gpu_type)
+        gpu_vram_gb = float(hw.get("gpu_vram_gb") or result.get("gpu_vram_gb") or 0.0)
+        os_name = str(hw.get("os_platform") or hw.get("os") or result.get("os") or "")
+
+        return {
+            "cpu_model": cpu_model,
+            "cpu_cores": cpu_cores,
+            "cpu_threads": cpu_threads,
+            "ram_gb": ram_gb,
+            "gpu_type": gpu_type,
+            "gpu_model": gpu_model,
+            "gpu_vram_gb": gpu_vram_gb,
+            "os": os_name,
+        }
+
     def publish_result(self, run_id: str, result: dict[str, Any]) -> dict[str, Any] | None:
         """Publish result to the FairBench leaderboard API."""
         if not self.config.publish:
             return None
 
         # Map MB values to GB for the API schema
-        vram_peak_gb = result.get("memory_result", {}).get("vram_peak_mb", 0) / 1024
-        ram_peak_gb = result.get("memory_result", {}).get("ram_peak_mb", 0) / 1024
+        memory_result = result.get("memory_result") or {}
+        vram_peak_gb = float(memory_result.get("vram_peak_mb") or 0) / 1024
+        ram_peak_gb = float(memory_result.get("ram_peak_mb") or 0) / 1024
 
         payload = {
             "run_id": run_id,
@@ -91,23 +122,14 @@ class Reporter:
             "n_threads": result["n_threads"],
             "timestamp": result["timestamp"],
             "category": result["category"],
-            "hardware": {
-                "cpu_model": result.get("cpu_model", ""),
-                "cpu_cores": result.get("cpu_cores", 0),
-                "cpu_threads": result.get("cpu_threads", 0),
-                "ram_gb": result.get("ram_gb", 0),
-                "gpu_type": result.get("gpu_type", "none"),
-                "gpu_model": result.get("gpu_model", ""),
-                "gpu_vram_gb": result.get("gpu_vram_gb", 0),
-                "os": result.get("os", ""),
-            },
+            "hardware": self._resolve_hardware(result),
             "quality_scores": {
                 qr["benchmark_name"]: qr["score"] for qr in result.get("quality_results", [])
             },
             "speed": {
-                "ttft_ms": result.get("speed_result", {}).get("ttft_avg", 0),
-                "tpot_ms": result.get("speed_result", {}).get("tpot_avg", 0),
-                "throughput": result.get("speed_result", {}).get("throughput_avg", 0),
+                "ttft_ms": (result.get("speed_result") or {}).get("ttft_avg") or 0,
+                "tpot_ms": (result.get("speed_result") or {}).get("tpot_avg") or 0,
+                "throughput": (result.get("speed_result") or {}).get("throughput_avg") or 0,
             },
             "memory": {
                 "vram_peak_gb": vram_peak_gb,
@@ -139,14 +161,15 @@ class Reporter:
         """Fetch latest results from the leaderboard."""
         try:
             response = requests.get(
-                f"{self.config.api_url}/results",
+                f"{self.config.api_url}/leaderboard",
                 params={"limit": limit},
                 timeout=30,
             )
             response.raise_for_status()
             resp_data = response.json()
-            assert isinstance(resp_data, list)
-            return resp_data  # type: ignore[return-value]
+            reports = resp_data.get("reports", []) if isinstance(resp_data, dict) else resp_data
+            assert isinstance(reports, list)
+            return reports  # type: ignore[return-value]
         except requests.RequestException as e:
             print(f"Leaderboard fetch failed: {e}")
             return []
