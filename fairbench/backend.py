@@ -15,6 +15,22 @@ from fairbench.types import MemoryResult, SpeedResult
 logger = logging.getLogger("fairbench")
 
 
+def _compute_speed_metrics(
+    ttft_ms: float, total_time_s: float, total_tokens: int
+) -> tuple[float, float]:
+    """Return (tpot_ms, throughput_tps) from measured timings.
+
+    TPOT = decode time per token after the first (standard definition).
+    Throughput = generated tokens / decode time.
+    """
+    if total_tokens <= 1:
+        return 0.0, 0.0
+    decode_time_s = max(total_time_s - ttft_ms / 1000.0, 1e-9)
+    tpot_ms = decode_time_s * 1000.0 / (total_tokens - 1)
+    throughput = total_tokens / decode_time_s
+    return tpot_ms, throughput
+
+
 def benchmark_speed(
     model_path: str,
     prompt: str = "The quick brown fox jumps over the lazy dog. " * 10,
@@ -47,9 +63,10 @@ def _benchmark_with_llama_cpp(
     Llama: type,  # type: ignore[type-arg]
 ) -> SpeedResult:
     """Benchmark using llama-cpp-python directly."""
-    ttfts: list[float] = []
+    ttfs: list[float] = []
     tpots: list[float] = []
     throughputs: list[float] = []
+    total_tokens = 0
 
     with Progress(
         SpinnerColumn(),
@@ -75,21 +92,24 @@ def _benchmark_with_llama_cpp(
                     stream=True,
                 )
 
-                ttft = time.time() - start
-                ttfts.append(ttft * 1000)  # ms
-
-                token_count = 0
-                last_time = time.time()
-                for chunk in response:
-                    if time.time() - last_time > 0.01:
-                        elapsed = time.time() - last_time
-                        tpots.append((token_count / elapsed) if elapsed > 0 else 0)
-                        token_count = 0
-                        last_time = time.time()
-                    token_count += 1
+                ttft_ms: float | None = None
+                total_tokens = 0
+                for _chunk in response:
+                    if ttft_ms is None:
+                        ttft_ms = (time.time() - start) * 1000.0
+                    total_tokens += 1
 
                 total_time = time.time() - start
-                throughput = token_count / total_time if total_time > 0 else 0
+                if ttft_ms is None:
+                    logger.warning("Run %d produced no tokens", i + 1)
+                    progress.update(task, completed=1)
+                    continue
+
+                tpot_ms, throughput = _compute_speed_metrics(
+                    ttft_ms, total_time, total_tokens
+                )
+                ttfs.append(ttft_ms)
+                tpots.append(tpot_ms)
                 throughputs.append(throughput)
 
                 llm.close()
@@ -99,10 +119,11 @@ def _benchmark_with_llama_cpp(
                 logger.warning("Run %d failed: %s", i + 1, e)
 
     return SpeedResult(
-        ttft_avg=sum(ttfts) / len(ttfts) if ttfts else 0.0,
+        ttft_avg=sum(ttfs) / len(ttfs) if ttfs else 0.0,
         tpot_avg=sum(tpots) / len(tpots) if tpots else 0.0,
         throughput_avg=sum(throughputs) / len(throughputs) if throughputs else 0.0,
-        runs=len(ttfts),
+        runs=len(ttfs),
+        metadata={"total_tokens": total_tokens},
     )
 
 

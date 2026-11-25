@@ -51,8 +51,8 @@ Requires the `[ml]` extra (`lm-eval`). If `lm-eval` is not installed, FairBench 
 Measured via `llama-cpp-python` bindings over 3 averaged runs (falls back to the `llama-bench` CLI if bindings are unavailable):
 
 - **TTFT** (Time To First Token) — first-token latency, in ms
-- **TPOT** — generation speed sampled as a token rate (tokens/s) over sliding windows. *Note:* despite the historical name and API column (`speed_tpot_ms`), this value is a **rate**, not milliseconds per token
-- **Throughput** — generated tokens / total wall-clock time, in tokens/s
+- **TPOT** (Time Per Output Token) — mean decode time per token, in ms, excluding the first generated token
+- **Throughput** — generated tokens / decode time, in tokens/s
 
 ### Memory
 

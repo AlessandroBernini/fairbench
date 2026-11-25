@@ -237,7 +237,7 @@ class BenchmarkEngine:
             )
             run.speed_result = speed_result
             logger.info("  TTFT: %.2fms", speed_result.ttft_avg)
-            logger.info("  TPOT: %.4f tokens/s", speed_result.tpot_avg)
+            logger.info("  TPOT: %.2f ms/token", speed_result.tpot_avg)
             logger.info("  Throughput: %.2f tokens/s", speed_result.throughput_avg)
 
             # Save partial results after speed

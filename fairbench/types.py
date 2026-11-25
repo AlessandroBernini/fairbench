@@ -46,7 +46,7 @@ class SpeedResult:
     """Results from speed benchmarks."""
 
     ttft_avg: float = 0.0  # Time to first token (ms)
-    tpot_avg: float = 0.0  # Tokens per second
+    tpot_avg: float = 0.0  # Time per output token (ms), excluding first
     throughput_avg: float = 0.0
     runs: int = 3
     metadata: dict[str, Any] = field(default_factory=dict)

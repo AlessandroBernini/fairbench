@@ -49,7 +49,6 @@ def test_gsm8k_run_raises_without_lm_eval(monkeypatch):
         def find_spec(self, name, path, target=None):
             if name == "lm_eval":
                 raise ImportError("No module named 'lm_eval'")
-            return None
 
     blocker = _BlockLmEval()
     sys.meta_path.insert(0, blocker)

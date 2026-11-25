@@ -47,7 +47,7 @@ Submit a benchmark report. This is the payload sent by `fairbench`'s reporter (`
 }
 ```
 
-> **Note:** `speed.tpot_ms` carries a token *rate* (tokens/s) despite the column name — see README "Speed". A code fix to rename/recompute is tracked separately.
+> **Note:** `speed.tpot_ms` now carries the true milliseconds-per-token value for reports generated after the fix; historical rows may contain token rates (see README "Speed").
 
 **Legacy format:** the server also accepts older clients that send nested `model: {name, quantization}` and top-level `id`; these are mapped to the same columns. Unknown/missing optional fields default to `0` / `"none"` / generated UUID (`run_id`) / current time.
 
