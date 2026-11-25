@@ -1,5 +1,6 @@
 // GET /api/leaderboard - Get leaderboard with optional filters
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getDb, getDbError } from './db';
 
 export const config = {
   api: {
@@ -22,6 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = await getDb();
 
     const { model, gpu, min_score } = req.query;
+
+    const rawLimit = req.query.limit;
+    const parsedLimit = parseInt(Array.isArray(rawLimit) ? String(rawLimit[0]) : String(rawLimit ?? "100"), 10);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 100;
+
     let query = `
       SELECT 
         id, timestamp, model_name, quantization,
@@ -54,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idx++;
     }
 
-    query += ` ORDER BY quality_mmlu DESC, speed_throughput DESC LIMIT 100`;
+    query += ` ORDER BY quality_mmlu DESC, speed_throughput DESC LIMIT ${limit}`;
 
     const result = await sql(query, params);
     return res.status(200).json({ reports: result });

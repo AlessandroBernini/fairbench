@@ -2,6 +2,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'crypto';
 
+import { getDb, getDbError } from './db';
+
 export const config = {
   api: {
     bodyParser: true,
