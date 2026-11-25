@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 
@@ -119,7 +120,8 @@ class BenchmarkConfig:
     default_quant: str = "q4_k_m"
     default_threads: int = 0
     publish: bool = True
-    results_dir: str = "/home/jarvispi/.fairbench/results"
+    # Resolve the current user home for each new config instance.
+    results_dir: str = field(default_factory=lambda: str(Path.home() / ".fairbench" / "results"))
     lite_mode: LiteMode = LiteMode.AUTO
     swebench_instances: int = 0
     swebench_split: str = "full"
